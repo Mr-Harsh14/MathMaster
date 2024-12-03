@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Tab } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { PlusIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, ClipboardDocumentListIcon, CheckCircleIcon, UserIcon } from '@heroicons/react/24/outline'
 import StudentsList from '@/components/classes/students-list'
 import QuizList from '@/components/classes/quiz-list'
 import CreateQuizDialog from '@/components/classes/create-quiz-dialog'
@@ -27,15 +27,10 @@ export default function ClassPage() {
   const { classData, loading, error, refresh } = useClass(classId)
 
   const handleQuizCreated = async () => {
-    // Close the dialog first
     setIsCreateQuizOpen(false)
-    
-    // Refresh both the quiz list and class data
-    setRefreshKey(prev => prev + 1)
     await refresh()
-    
-    // Force a router refresh to update all components
     router.refresh()
+    setRefreshKey(prev => prev + 1)
   }
 
   const tabs = [
@@ -148,24 +143,157 @@ function Overview({ classData }: { classData: any }) {
   const { data: session } = useSession()
   const isTeacher = session?.user?.role === 'TEACHER'
 
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <dt className="text-sm font-medium text-gray-500 truncate">
-            {isTeacher ? 'Total Students' : 'Classmates'}
-          </dt>
-          <dd className="mt-1 text-3xl font-semibold text-gray-900">
-            {classData._count.students}
-          </dd>
+  if (!classData.recentActivity) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <dt className="text-sm font-medium text-gray-500 truncate">
+                {isTeacher ? 'Total Students' : 'Classmates'}
+              </dt>
+              <dd className="mt-1 text-3xl font-semibold text-gray-900">
+                {classData._count.students}
+              </dd>
+            </div>
+          </div>
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <dt className="text-sm font-medium text-gray-500 truncate">Total Quizzes</dt>
+              <dd className="mt-1 text-3xl font-semibold text-gray-900">
+                {classData._count.quizzes}
+              </dd>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="bg-white overflow-hidden shadow rounded-lg">
+    )
+  }
+
+  const allActivity = [
+    ...classData.recentActivity.attempts.map((attempt: any) => ({
+      type: 'attempt',
+      data: attempt,
+      date: attempt.createdAt ? new Date(attempt.createdAt) : new Date(),
+    })),
+    ...classData.recentActivity.quizzes.map((quiz: any) => ({
+      type: 'quiz',
+      data: quiz,
+      date: quiz.createdAt ? new Date(quiz.createdAt) : new Date(),
+    })),
+    ...classData.recentActivity.students.map((student: any) => ({
+      type: 'student',
+      data: student,
+      date: student.createdAt ? new Date(student.createdAt) : new Date(),
+    })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime())
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <dt className="text-sm font-medium text-gray-500 truncate">
+              {isTeacher ? 'Total Students' : 'Classmates'}
+            </dt>
+            <dd className="mt-1 text-3xl font-semibold text-gray-900">
+              {classData._count.students}
+            </dd>
+          </div>
+        </div>
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <dt className="text-sm font-medium text-gray-500 truncate">Total Quizzes</dt>
+            <dd className="mt-1 text-3xl font-semibold text-gray-900">
+              {classData._count.quizzes}
+            </dd>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <dt className="text-sm font-medium text-gray-500 truncate">Total Quizzes</dt>
-          <dd className="mt-1 text-3xl font-semibold text-gray-900">
-            {classData._count.quizzes}
-          </dd>
+          <h3 className="text-lg font-medium leading-6 text-gray-900">Recent Activity</h3>
+          {allActivity.length === 0 ? (
+            <p className="mt-4 text-sm text-gray-500">No recent activity</p>
+          ) : (
+            <div className="mt-6 flow-root">
+              <ul role="list" className="-mb-8">
+                {allActivity.map((item, itemIdx) => (
+                  <li key={itemIdx}>
+                    <div className="relative pb-8">
+                      {itemIdx !== allActivity.length - 1 ? (
+                        <span
+                          className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      <div className="relative flex space-x-3">
+                        <div>
+                          <span
+                            className={cn(
+                              'h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white',
+                              {
+                                'bg-blue-500': item.type === 'quiz',
+                                'bg-green-500': item.type === 'attempt',
+                                'bg-purple-500': item.type === 'student',
+                              }
+                            )}
+                          >
+                            {item.type === 'quiz' ? (
+                              <ClipboardDocumentListIcon className="h-5 w-5 text-white" aria-hidden="true" />
+                            ) : item.type === 'attempt' ? (
+                              <CheckCircleIcon className="h-5 w-5 text-white" aria-hidden="true" />
+                            ) : (
+                              <UserIcon className="h-5 w-5 text-white" aria-hidden="true" />
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex min-w-0 flex-1 justify-between space-x-4">
+                          <div>
+                            <p className="text-sm text-gray-500">
+                              {item.type === 'quiz' ? (
+                                <>New quiz created: <span className="font-medium text-gray-900">{item.data.title}</span></>
+                              ) : item.type === 'attempt' ? (
+                                <>
+                                  <span className="font-medium text-gray-900">
+                                    {item.data.studentName}
+                                  </span>{' '}
+                                  completed{' '}
+                                  <span className="font-medium text-gray-900">
+                                    {item.data.quizTitle}
+                                  </span>{' '}
+                                  with score{' '}
+                                  <span className="font-medium text-gray-900">
+                                    {item.data.score}/{item.data.maxScore} (
+                                    {Math.round((item.data.score / item.data.maxScore) * 100)}%)
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-medium text-gray-900">{item.data.name}</span>{' '}
+                                  joined the class
+                                </>
+                              )}
+                            </p>
+                          </div>
+                          <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                            {item.date instanceof Date && !isNaN(item.date.getTime()) ? (
+                              <time dateTime={item.date.toISOString()}>
+                                {item.date.toLocaleDateString()}
+                              </time>
+                            ) : (
+                              <span>Recently</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </div>

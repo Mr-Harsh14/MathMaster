@@ -22,7 +22,7 @@ export async function GET(
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
-    // Check if user has access to this class
+    // Check if user has access to this class and get class data
     const classAccess = await prisma.class.findFirst({
       where: {
         id: params.id,
@@ -37,6 +37,34 @@ export async function GET(
             name: true,
             email: true,
           },
+        },
+        students: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 5,
+        },
+        quizzes: {
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            _count: {
+              select: {
+                questions: true,
+                scores: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 5,
         },
         _count: {
           select: {
@@ -54,7 +82,58 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(classAccess)
+    // Get recent quiz attempts
+    const recentAttempts = await prisma.score.findMany({
+      where: {
+        quiz: {
+          classId: params.id,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+        quiz: {
+          select: {
+            title: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 5,
+    })
+
+    // Format the response
+    const response = {
+      ...classAccess,
+      recentActivity: {
+        students: classAccess.students.map(student => ({
+          id: student.id,
+          name: student.name,
+          email: user.role === 'TEACHER' ? student.email : undefined,
+        })),
+        quizzes: classAccess.quizzes,
+        attempts: recentAttempts.map(attempt => ({
+          id: attempt.id,
+          studentName: attempt.user.name,
+          studentEmail: user.role === 'TEACHER' ? attempt.user.email : undefined,
+          quizTitle: attempt.quiz.title,
+          score: attempt.score,
+          maxScore: attempt.maxScore,
+          createdAt: attempt.createdAt,
+        })),
+      },
+      // Remove the raw data from the response
+      students: undefined,
+      quizzes: undefined,
+    }
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Error fetching class:', error)
     return NextResponse.json(

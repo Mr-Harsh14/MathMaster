@@ -103,6 +103,8 @@ export default function CreateQuizDialog({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
         },
         body: JSON.stringify(requestData),
       })
@@ -127,7 +129,7 @@ export default function CreateQuizDialog({
       ])
 
       // Call success callback and close dialog
-      onSuccess()
+      await onSuccess()
     } catch (error) {
       console.error('Error creating quiz:', error)
       setError(error instanceof Error ? error.message : 'Something went wrong')
