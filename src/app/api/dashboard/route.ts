@@ -37,7 +37,7 @@ export async function GET() {
         studentsCount,
         classesCount,
         quizzesCount,
-        quizAttempts
+        scores
       ] = await Promise.all([
         prisma.user.count({
           where: {
@@ -61,7 +61,7 @@ export async function GET() {
             }
           }
         }),
-        prisma.quizAttempt.findMany({
+        prisma.score.findMany({
           where: {
             quiz: {
               class: {
@@ -98,8 +98,8 @@ export async function GET() {
       ])
 
       // Calculate average score
-      const totalScore = quizAttempts.reduce((sum, attempt) => sum + attempt.score, 0)
-      const totalMaxScore = quizAttempts.reduce((sum, attempt) => sum + attempt.maxScore, 0)
+      const totalScore = scores.reduce((sum, score) => sum + score.score, 0)
+      const totalMaxScore = scores.reduce((sum, score) => sum + score.maxScore, 0)
       const averageScore = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0
 
       stats = {
@@ -162,13 +162,13 @@ export async function GET() {
       }).sort((a, b) => b.score - a.score)
 
       // Format recent activity
-      recentActivity = quizAttempts.map(attempt => ({
+      recentActivity = scores.map(score => ({
         type: 'attempt',
-        title: `${attempt.user.name || attempt.user.email} completed ${attempt.quiz.title}`,
-        subtitle: `in ${attempt.quiz.class.name}`,
-        score: attempt.score,
-        maxScore: attempt.maxScore,
-        date: attempt.createdAt.toISOString()
+        title: `${score.user.name || score.user.email} completed ${score.quiz.title}`,
+        subtitle: `in ${score.quiz.class.name}`,
+        score: score.score,
+        maxScore: score.maxScore,
+        date: score.createdAt.toISOString()
       }))
 
       return NextResponse.json({
@@ -181,7 +181,7 @@ export async function GET() {
       // Student-specific data
       const [
         classesCount,
-        quizAttempts,
+        scores,
         upcomingQuizzes,
         studentRank
       ] = await Promise.all([
@@ -194,7 +194,7 @@ export async function GET() {
             }
           }
         }),
-        prisma.quizAttempt.findMany({
+        prisma.score.findMany({
           where: {
             userId: user.id
           },
@@ -237,7 +237,7 @@ export async function GET() {
           select: {
             id: true,
             title: true,
-            dueDate: true,
+            timeLimit: true,
             questions: {
               select: {
                 id: true
@@ -256,46 +256,22 @@ export async function GET() {
             role: 'STUDENT',
             quizAttempts: {
               some: {}
-            },
-            AND: {
-              quizAttempts: {
-                every: {
-                  score: {
-                    gt: {
-                      _avg: {
-                        score: {
-                          where: {
-                            userId: user.id
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
             }
           }
         })
       ])
 
       // Calculate average score
-      const totalScore = quizAttempts.reduce((sum, attempt) => sum + attempt.score, 0)
-      const totalMaxScore = quizAttempts.reduce((sum, attempt) => sum + attempt.maxScore, 0)
+      const totalScore = scores.reduce((sum, score) => sum + score.score, 0)
+      const totalMaxScore = scores.reduce((sum, score) => sum + score.maxScore, 0)
       const averageScore = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0
 
       stats = {
         totalClasses: classesCount,
-        quizzesCompleted: quizAttempts.length,
+        quizzesCompleted: scores.length,
         averageScore,
-        rank: studentRank + 1,
-        totalStudentsInRank: await prisma.user.count({
-          where: {
-            role: 'STUDENT',
-            quizAttempts: {
-              some: {}
-            }
-          }
-        })
+        rank: 1, // Simplified ranking for now
+        totalStudentsInRank: studentRank
       }
 
       // Get performance by class
@@ -311,26 +287,11 @@ export async function GET() {
           id: true,
           name: true,
           students: {
-            where: {
-              quizAttempts: {
-                some: {
-                  quiz: {
-                    classId: {
-                      equals: prisma.class.fields.id
-                    }
-                  }
-                }
-              }
+            select: {
+              id: true
             }
           },
           quizzes: {
-            where: {
-              scores: {
-                some: {
-                  userId: user.id
-                }
-              }
-            },
             select: {
               scores: {
                 where: {
@@ -356,19 +317,19 @@ export async function GET() {
           className: classData.name,
           averageScore,
           quizzesTaken: attempts.length,
-          rank: 1, // Placeholder - would need more complex query for actual rank
+          rank: 1, // Simplified ranking for now
           totalStudents: classData.students.length
         }
       })
 
       // Format recent activity
-      recentActivity = quizAttempts.slice(0, 10).map(attempt => ({
+      recentActivity = scores.slice(0, 10).map(score => ({
         type: 'quiz',
-        title: `Completed ${attempt.quiz.title}`,
-        subtitle: `in ${attempt.quiz.class.name}`,
-        score: attempt.score,
-        maxScore: attempt.maxScore,
-        date: attempt.createdAt.toISOString()
+        title: `Completed ${score.quiz.title}`,
+        subtitle: `in ${score.quiz.class.name}`,
+        score: score.score,
+        maxScore: score.maxScore,
+        date: score.createdAt.toISOString()
       }))
 
       // Format upcoming quizzes
@@ -376,7 +337,7 @@ export async function GET() {
         id: quiz.id,
         title: quiz.title,
         className: quiz.class.name,
-        dueDate: quiz.dueDate?.toISOString(),
+        dueDate: null, // We don't have due dates in our schema yet
         totalQuestions: quiz.questions.length
       }))
 
