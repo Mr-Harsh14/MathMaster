@@ -48,7 +48,7 @@ export async function GET(
       select: {
         id: true,
         name: true,
-        email: true,
+        email: user.role === 'TEACHER',
         quizAttempts: {
           where: {
             quiz: {
@@ -67,7 +67,7 @@ export async function GET(
     const formattedStudents = students.map((student) => ({
       id: student.id,
       name: student.name,
-      email: student.email,
+      email: student.email || '',
       quizScores: student.quizAttempts,
     }))
 

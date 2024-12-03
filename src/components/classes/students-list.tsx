@@ -16,6 +16,7 @@ interface Student {
 
 export default function StudentsList({ classId }: { classId: string }) {
   const { data: session } = useSession()
+  const isTeacher = session?.user?.role === 'TEACHER'
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -89,9 +90,11 @@ export default function StudentsList({ classId }: { classId: string }) {
                       <p className="truncate font-medium text-indigo-600">
                         {student.name || 'Unnamed Student'}
                       </p>
-                      <p className="ml-1 flex-shrink-0 text-gray-400">
-                        ({student.email})
-                      </p>
+                      {isTeacher && (
+                        <p className="ml-1 flex-shrink-0 text-gray-400">
+                          ({student.email})
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 flex-shrink-0 sm:mt-0">
