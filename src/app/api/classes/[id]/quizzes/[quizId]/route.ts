@@ -64,7 +64,13 @@ export async function GET(
       // For students, don't include answers
       const quiz = await prisma.quiz.findUnique({
         where: { id: params.quizId },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          timeLimit: true,
+          classId: true,
+          createdAt: true,
+          updatedAt: true,
           questions: {
             select: {
               id: true,
@@ -167,6 +173,7 @@ export async function POST(
           select: {
             id: true,
             answer: true,
+            explanation: true,
           },
         },
       },
@@ -206,6 +213,8 @@ export async function POST(
     return NextResponse.json({
       score,
       maxScore: quiz.questions.length,
+      correctAnswers: quiz.questions.map(q => q.answer),
+      explanations: quiz.questions.map(q => q.explanation),
     })
   } catch (error) {
     console.error('Error submitting quiz:', error)

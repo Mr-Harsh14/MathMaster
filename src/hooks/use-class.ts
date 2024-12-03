@@ -1,43 +1,52 @@
-import { useState, useEffect } from 'react'
+'use client'
 
-interface ClassData {
-  id: string
-  name: string
-  code: string
-  teacherId: string
-  teacher: {
-    name: string | null
-    email: string
-  }
-  _count: {
-    students: number
-    quizzes: number
-  }
-}
+import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 
 export default function useClass(classId: string) {
-  const [classData, setClassData] = useState<ClassData | null>(null)
+  const { data: session } = useSession()
+  const [classData, setClassData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  useEffect(() => {
-    async function fetchClass() {
-      try {
-        const response = await fetch(`/api/classes/${classId}`)
-        if (!response.ok) {
-          throw new Error('Failed to fetch class')
-        }
-        const data = await response.json()
-        setClassData(data)
-      } catch (error) {
-        setError(error instanceof Error ? error.message : 'Something went wrong')
-      } finally {
-        setLoading(false)
+  const fetchClass = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/classes/${classId}`, {
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to fetch class')
       }
+      const data = await response.json()
+      console.log('Fetched class data:', data)
+      setClassData(data)
+    } catch (error) {
+      console.error('Error fetching class:', error)
+      setError(error instanceof Error ? error.message : 'Failed to load class')
+      throw error
+    } finally {
+      setLoading(false)
     }
-
-    fetchClass()
   }, [classId])
 
-  return { classData, loading, error }
+  useEffect(() => {
+    if (session?.user?.email) {
+      fetchClass()
+    }
+  }, [session, fetchClass, refreshKey])
+
+  const refresh = async () => {
+    setRefreshKey(prev => prev + 1)
+    try {
+      await fetchClass()
+    } catch (error) {
+      console.error('Error refreshing class:', error)
+    }
+  }
+
+  return { classData, loading, error, refresh }
 } 

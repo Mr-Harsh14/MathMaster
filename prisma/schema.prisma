@@ -39,6 +39,7 @@ model Quiz {
   class       Class     @relation(fields: [classId], references: [id])
   questions   Question[]
   scores      Score[]
+  timeLimit   Int?      // Time limit in minutes, null means no limit
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }

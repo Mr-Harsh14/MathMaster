@@ -17,10 +17,12 @@ interface Question {
 export default function CreateQuizDialog({
   open,
   onClose,
+  onSuccess,
   classId,
 }: {
   open: boolean
   onClose: () => void
+  onSuccess: () => void
   classId: string
 }) {
   const router = useRouter()
@@ -35,11 +37,31 @@ export default function CreateQuizDialog({
       explanation: '',
     },
   ])
+  const [timeLimit, setTimeLimit] = useState<number | ''>(30)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     setLoading(true)
+
+    // Log form data
+    console.log('Form data:', {
+      title,
+      timeLimit,
+      questions: questions.map(q => ({
+        question: q.question,
+        options: q.options,
+        answer: q.answer,
+        explanation: q.explanation,
+      })),
+    })
+
+    // Validate title
+    if (!title.trim()) {
+      setError('Please enter a quiz title')
+      setLoading(false)
+      return
+    }
 
     // Validate questions
     const isValid = questions.every(
@@ -55,26 +77,46 @@ export default function CreateQuizDialog({
       return
     }
 
+    // Validate answers
+    const invalidQuestions = questions.filter(q => !q.options.includes(q.answer))
+    if (invalidQuestions.length > 0) {
+      setError('Each question must have a valid answer selected from its options')
+      setLoading(false)
+      return
+    }
+
     try {
+      console.log('Making API request to:', `/api/classes/${classId}/quizzes`)
+      const requestData = {
+        title: title.trim(),
+        questions: questions.map(q => ({
+          question: q.question.trim(),
+          options: q.options.map(opt => opt.trim()),
+          answer: q.answer.trim(),
+          explanation: q.explanation?.trim() || '',
+        })),
+        timeLimit: timeLimit || null,
+      }
+      console.log('Request data:', requestData)
+
       const response = await fetch(`/api/classes/${classId}/quizzes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title,
-          questions,
-        }),
+        body: JSON.stringify(requestData),
       })
 
+      const data = await response.json()
+      console.log('API response:', data)
+
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to create quiz')
+        throw new Error(data.message || 'Failed to create quiz')
       }
 
-      router.refresh()
-      onClose()
+      // Reset form
       setTitle('')
+      setTimeLimit(30)
       setQuestions([
         {
           question: '',
@@ -83,7 +125,11 @@ export default function CreateQuizDialog({
           explanation: '',
         },
       ])
+
+      // Call success callback and close dialog
+      onSuccess()
     } catch (error) {
+      console.error('Error creating quiz:', error)
       setError(error instanceof Error ? error.message : 'Something went wrong')
     } finally {
       setLoading(false)
@@ -98,6 +144,7 @@ export default function CreateQuizDialog({
     }
     newQuestions[index] = { ...newQuestions[index], [field]: value }
     setQuestions(newQuestions)
+    console.log('Question updated:', { index, field, value, newQuestions })
   }
 
   function handleOptionChange(questionIndex: number, optionIndex: number, value: string) {
@@ -109,6 +156,7 @@ export default function CreateQuizDialog({
       ),
     }
     setQuestions(newQuestions)
+    console.log('Option updated:', { questionIndex, optionIndex, value, newQuestions })
   }
 
   function addQuestion() {
@@ -160,6 +208,25 @@ export default function CreateQuizDialog({
                   className="mt-1"
                   placeholder="e.g., Chapter 1: Algebra Basics"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="timeLimit" className="block text-sm font-medium text-gray-700">
+                  Time Limit (minutes)
+                </label>
+                <Input
+                  type="number"
+                  id="timeLimit"
+                  value={timeLimit}
+                  onChange={(e) => setTimeLimit(e.target.value ? parseInt(e.target.value) : '')}
+                  min="1"
+                  max="180"
+                  className="mt-1"
+                  placeholder="Leave empty for no time limit"
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Set a time limit between 1 and 180 minutes, or leave empty for no limit
+                </p>
               </div>
 
               {questions.map((question, questionIndex) => (

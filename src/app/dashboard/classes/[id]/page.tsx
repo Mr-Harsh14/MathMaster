@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Tab } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -19,15 +19,38 @@ function classNames(...classes: string[]) {
 export default function ClassPage() {
   const { data: session } = useSession()
   const params = useParams()
+  const router = useRouter()
   const classId = params.id as string
   const isTeacher = session?.user?.role === 'TEACHER'
   const [isCreateQuizOpen, setIsCreateQuizOpen] = useState(false)
-  const { classData, loading, error } = useClass(classId)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const { classData, loading, error, refresh } = useClass(classId)
+
+  const handleQuizCreated = async () => {
+    // Close the dialog first
+    setIsCreateQuizOpen(false)
+    
+    // Refresh both the quiz list and class data
+    setRefreshKey(prev => prev + 1)
+    await refresh()
+    
+    // Force a router refresh to update all components
+    router.refresh()
+  }
 
   const tabs = [
-    { name: 'Overview', component: <Overview classData={classData} /> },
-    { name: 'Students', component: <StudentsList classId={classId} /> },
-    { name: 'Quizzes', component: <QuizList classId={classId} /> },
+    { 
+      name: 'Overview', 
+      component: <Overview key={refreshKey} classData={classData} /> 
+    },
+    { 
+      name: 'Students', 
+      component: <StudentsList key={refreshKey} classId={classId} /> 
+    },
+    { 
+      name: 'Quizzes', 
+      component: <QuizList key={refreshKey} classId={classId} /> 
+    },
   ]
 
   if (loading) {
@@ -46,6 +69,12 @@ export default function ClassPage() {
       <div className="text-center">
         <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading class</h3>
         <p className="mt-1 text-sm text-gray-500">{error || 'Class not found'}</p>
+        <button
+          onClick={refresh}
+          className="mt-4 text-sm text-indigo-600 hover:text-indigo-500"
+        >
+          Try again
+        </button>
       </div>
     )
   }
@@ -108,6 +137,7 @@ export default function ClassPage() {
       <CreateQuizDialog
         open={isCreateQuizOpen}
         onClose={() => setIsCreateQuizOpen(false)}
+        onSuccess={handleQuizCreated}
         classId={classId}
       />
     </div>

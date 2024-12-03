@@ -24,24 +24,45 @@ export default function QuizList({ classId }: { classId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetchQuizzes() {
-      try {
-        const response = await fetch(`/api/classes/${classId}/quizzes`)
-        if (!response.ok) {
-          throw new Error('Failed to fetch quizzes')
-        }
-        const data = await response.json()
-        setQuizzes(data)
-      } catch (error) {
-        setError(error instanceof Error ? error.message : 'Something went wrong')
-      } finally {
-        setLoading(false)
+  const fetchQuizzes = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/classes/${classId}/quizzes`, {
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to fetch quizzes')
       }
+      const data = await response.json()
+      console.log('Fetched quizzes:', data)
+      setQuizzes(data)
+    } catch (error) {
+      console.error('Error fetching quizzes:', error)
+      setError(error instanceof Error ? error.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchQuizzes()
-  }, [classId])
+  useEffect(() => {
+    if (session?.user?.email) {
+      fetchQuizzes()
+    }
+  }, [classId, session])
+
+  if (!session?.user?.email) {
+    return (
+      <div className="text-center">
+        <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-semibold text-gray-900">Not signed in</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Please sign in to view quizzes.
+        </p>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -56,8 +77,15 @@ export default function QuizList({ classId }: { classId: string }) {
   if (error) {
     return (
       <div className="text-center">
+        <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-gray-400" />
         <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading quizzes</h3>
         <p className="mt-1 text-sm text-gray-500">{error}</p>
+        <button
+          onClick={fetchQuizzes}
+          className="mt-4 text-sm text-indigo-600 hover:text-indigo-500"
+        >
+          Try again
+        </button>
       </div>
     )
   }

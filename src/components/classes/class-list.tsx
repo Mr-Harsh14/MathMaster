@@ -21,27 +21,46 @@ interface Class {
 }
 
 export default function ClassList({ isTeacher }: { isTeacher: boolean }) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchClasses() {
       try {
         const response = await fetch('/api/classes')
         const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to fetch classes')
+        }
+
+        // Even if response is ok, ensure data is an array
+        if (!Array.isArray(data)) {
+          console.error('Invalid response format:', data)
+          throw new Error('Unexpected response format')
+        }
+
         setClasses(data)
+        setError(null)
       } catch (error) {
         console.error('Error fetching classes:', error)
+        setError(error instanceof Error ? error.message : 'Failed to load classes')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchClasses()
-  }, [])
+    // Only fetch if user is authenticated
+    if (status === 'authenticated' && session?.user?.email) {
+      fetchClasses()
+    } else if (status === 'unauthenticated') {
+      setLoading(false)
+    }
+  }, [session, status])
 
-  if (loading) {
+  if (status === 'loading' || loading) {
     return (
       <div className="text-center">
         <div className="animate-pulse">
@@ -49,6 +68,34 @@ export default function ClassList({ isTeacher }: { isTeacher: boolean }) {
           <div className="h-32 bg-gray-200 rounded-lg mb-4"></div>
           <div className="h-32 bg-gray-200 rounded-lg"></div>
         </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="text-center">
+        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading classes</h3>
+        <p className="mt-1 text-sm text-gray-500">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 text-sm text-indigo-600 hover:text-indigo-500"
+        >
+          Try again
+        </button>
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="text-center">
+        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-semibold text-gray-900">Not signed in</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Please sign in to view your classes.
+        </p>
       </div>
     )
   }

@@ -111,18 +111,26 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession()
+    console.log('Session:', session)
 
     if (!session?.user?.email) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { message: 'Please sign in to create a quiz' },
+        { status: 401 }
+      )
     }
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: { id: true, role: true },
     })
+    console.log('User:', user)
 
     if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 })
+      return NextResponse.json(
+        { message: 'User account not found' },
+        { status: 404 }
+      )
     }
 
     if (user.role !== 'TEACHER') {
@@ -139,6 +147,7 @@ export async function POST(
         teacherId: user.id,
       },
     })
+    console.log('Class access:', classAccess)
 
     if (!classAccess) {
       return NextResponse.json(
@@ -147,44 +156,122 @@ export async function POST(
       )
     }
 
-    const { title, questions } = await req.json()
+    const body = await req.json()
+    console.log('Received request body:', JSON.stringify(body, null, 2))
 
-    if (!title || !questions || questions.length === 0) {
+    const { title, questions, timeLimit } = body
+
+    // Validate title
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(
-        { message: 'Title and questions are required' },
+        { message: 'Please provide a valid quiz title' },
         { status: 400 }
       )
     }
 
-    // Create quiz with questions
-    const quiz = await prisma.quiz.create({
-      data: {
-        title,
+    // Validate questions
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return NextResponse.json(
+        { message: 'Please provide at least one question' },
+        { status: 400 }
+      )
+    }
+
+    // Validate each question
+    for (const q of questions) {
+      console.log('Validating question:', q)
+      if (!q.question || typeof q.question !== 'string' || q.question.trim().length === 0) {
+        return NextResponse.json(
+          { message: 'Each question must have valid text' },
+          { status: 400 }
+        )
+      }
+
+      if (!Array.isArray(q.options) || q.options.length < 2) {
+        return NextResponse.json(
+          { message: 'Each question must have at least 2 options' },
+          { status: 400 }
+        )
+      }
+
+      if (!q.options.every(opt => typeof opt === 'string' && opt.trim().length > 0)) {
+        return NextResponse.json(
+          { message: 'All options must be non-empty text' },
+          { status: 400 }
+        )
+      }
+
+      if (!q.answer || typeof q.answer !== 'string' || !q.options.includes(q.answer)) {
+        return NextResponse.json(
+          { message: 'Each question must have a valid answer from its options' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate timeLimit
+    if (timeLimit !== null && (typeof timeLimit !== 'number' || timeLimit < 1 || timeLimit > 180)) {
+      return NextResponse.json(
+        { message: 'Time limit must be between 1 and 180 minutes' },
+        { status: 400 }
+      )
+    }
+
+    console.log('Creating quiz with data:', {
+      title,
+      classId: params.id,
+      timeLimit,
+      questionCount: questions.length,
+    })
+
+    try {
+      // Create quiz with questions
+      const quizData = {
+        title: title.trim(),
         classId: params.id,
         questions: {
           create: questions.map((q: any) => ({
-            question: q.question,
-            options: q.options,
-            answer: q.answer,
-            explanation: q.explanation,
+            question: q.question.trim(),
+            options: q.options.map((opt: string) => opt.trim()),
+            answer: q.answer.trim(),
+            explanation: q.explanation?.trim() || null,
           })),
         },
-      },
-      include: {
-        _count: {
-          select: {
-            questions: true,
-            scores: true,
+      }
+
+      // Only add timeLimit if it's a valid number
+      if (typeof timeLimit === 'number' && timeLimit > 0 && timeLimit <= 180) {
+        (quizData as any).timeLimit = timeLimit
+      }
+
+      console.log('Creating quiz with data:', quizData)
+
+      const quiz = await prisma.quiz.create({
+        data: quizData,
+        include: {
+          questions: true,
+          _count: {
+            select: {
+              questions: true,
+              scores: true,
+            },
           },
         },
-      },
-    })
+      })
 
-    return NextResponse.json(quiz, { status: 201 })
+      console.log('Quiz created successfully:', quiz.id)
+      return NextResponse.json(quiz, { status: 201 })
+    } catch (dbError) {
+      console.error('Database error:', dbError)
+      return NextResponse.json(
+        { message: 'Database error: ' + (dbError instanceof Error ? dbError.message : 'Unknown error') },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error('Error creating quiz:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Error: ' + (error instanceof Error ? error.message : 'Unknown error') },
       { status: 500 }
     )
   }
