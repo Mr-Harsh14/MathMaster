@@ -223,4 +223,68 @@ export async function POST(
       { status: 500 }
     )
   }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string; quizId: string } }
+) {
+  try {
+    const session = await getServerSession()
+    if (!session?.user?.email) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true, role: true },
+    })
+
+    if (!user || user.role !== 'TEACHER') {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id: classId, quizId } = params
+
+    // Verify the user is the teacher of this class
+    const classData = await prisma.class.findUnique({
+      where: { id: classId },
+      select: { teacherId: true }
+    })
+
+    if (!classData || classData.teacherId !== user.id) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Verify the quiz belongs to this class
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { classId: true }
+    })
+
+    if (!quiz || quiz.classId !== classId) {
+      return NextResponse.json({ message: 'Quiz not found' }, { status: 404 })
+    }
+
+    // Delete all related data first
+    await prisma.$transaction([
+      prisma.score.deleteMany({
+        where: { quizId }
+      }),
+      prisma.question.deleteMany({
+        where: { quizId }
+      }),
+      prisma.quiz.delete({
+        where: { id: quizId }
+      })
+    ])
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting quiz:', error)
+    return NextResponse.json(
+      { message: 'Failed to delete quiz' },
+      { status: 500 }
+    )
+  }
 } 

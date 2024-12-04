@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { UsersIcon } from '@heroicons/react/24/outline'
 import Link from 'next/link'
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
 
 interface Class {
   id: string
@@ -25,6 +28,8 @@ export default function ClassList({ isTeacher }: { isTeacher: boolean }) {
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchClasses() {
@@ -36,7 +41,6 @@ export default function ClassList({ isTeacher }: { isTeacher: boolean }) {
           throw new Error(data.message || 'Failed to fetch classes')
         }
 
-        // Even if response is ok, ensure data is an array
         if (!Array.isArray(data)) {
           console.error('Invalid response format:', data)
           throw new Error('Unexpected response format')
@@ -52,13 +56,39 @@ export default function ClassList({ isTeacher }: { isTeacher: boolean }) {
       }
     }
 
-    // Only fetch if user is authenticated
     if (status === 'authenticated' && session?.user?.email) {
       fetchClasses()
     } else if (status === 'unauthenticated') {
       setLoading(false)
     }
   }, [session, status])
+
+  const handleDelete = async (classId: string) => {
+    if (!confirm("Are you sure you want to delete this class? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsDeleting(classId);
+    try {
+      const response = await fetch(`/api/classes/${classId}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete class");
+      }
+
+      // Remove the deleted class from the state
+      setClasses(prevClasses => prevClasses.filter(c => c.id !== classId));
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      alert(error instanceof Error ? error.message : "Failed to delete class. Please try again.");
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   if (status === 'loading' || loading) {
     return (
@@ -74,92 +104,66 @@ export default function ClassList({ isTeacher }: { isTeacher: boolean }) {
 
   if (error) {
     return (
-      <div className="text-center">
-        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading classes</h3>
-        <p className="mt-1 text-sm text-gray-500">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 text-sm text-indigo-600 hover:text-indigo-500"
-        >
-          Try again
-        </button>
+      <div className="text-center text-red-500">
+        <p>{error}</p>
       </div>
     )
   }
 
-  if (status === 'unauthenticated') {
+  if (!classes || classes.length === 0) {
     return (
       <div className="text-center">
         <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-semibold text-gray-900">Not signed in</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Please sign in to view your classes.
-        </p>
-      </div>
-    )
-  }
-
-  if (classes.length === 0) {
-    return (
-      <div className="text-center">
-        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-semibold text-gray-900">No classes</h3>
+        <h3 className="mt-2 text-sm font-medium text-gray-900">
+          {isTeacher ? "No classes created" : "No classes joined"}
+        </h3>
         <p className="mt-1 text-sm text-gray-500">
           {isTeacher
-            ? 'Get started by creating a new class.'
-            : 'Join a class using a class code.'}
+            ? "Get started by creating a new class."
+            : "Join a class using a class code."}
         </p>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {classes.map((classItem) => (
-        <Link
-          key={classItem.id}
-          href={`/dashboard/classes/${classItem.id}`}
-          className="relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white hover:shadow-md transition-shadow"
-        >
-          <div className="flex flex-1 flex-col p-6">
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <p className="text-xl font-semibold text-gray-900">{classItem.name}</p>
-                <p className="text-sm text-gray-500">Code: {classItem.code}</p>
-              </div>
-              <p className="mt-3 text-sm text-gray-500">
-                Teacher: {classItem.teacher.name || classItem.teacher.email}
-              </p>
-            </div>
-            <div className="mt-6 flex items-center gap-8">
-              <div className="flex items-center gap-2">
-                <UsersIcon className="h-5 w-5 text-gray-400" />
-                <span className="text-sm text-gray-500">
-                  {classItem._count.students} Students
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {classes.map((class_) => (
+        <Card key={class_.id} className="p-4">
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{class_.name}</h3>
+              {isTeacher && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDelete(class_.id)}
+                  disabled={isDeleting === class_.id}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <span className="text-sm text-gray-500">
-                  {classItem._count.quizzes} Quizzes
-                </span>
-              </div>
+                  {isDeleting === class_.id ? "Deleting..." : "Delete"}
+                </Button>
+              )}
             </div>
+            
+            <div className="flex items-center space-x-4 text-sm text-gray-500">
+              <div>Students: {class_._count.students}</div>
+              <div>Quizzes: {class_._count.quizzes}</div>
+            </div>
+            
+            {isTeacher && (
+              <div className="text-sm text-gray-500">
+                Class Code: <span className="font-mono">{class_.code}</span>
+              </div>
+            )}
+
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/dashboard/classes/${class_.id}`)}
+            >
+              View Details
+            </Button>
           </div>
-        </Link>
+        </Card>
       ))}
     </div>
   )
