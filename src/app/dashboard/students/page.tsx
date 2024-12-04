@@ -2,17 +2,28 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import {
-  UsersIcon,
-  MagnifyingGlassIcon,
-  AcademicCapIcon,
-  FolderIcon,
-} from '@heroicons/react/24/outline'
 import Link from 'next/link'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import {
+  MagnifyingGlassIcon,
+  ChartBarIcon,
+  AcademicCapIcon,
+  ClockIcon,
+  ArrowTrendingUpIcon,
+} from '@heroicons/react/24/outline'
 
 interface Student {
   id: string
-  name: string | null
+  name: string
   email: string
   enrolledClasses: {
     id: string
@@ -31,19 +42,25 @@ interface Student {
 }
 
 export default function StudentsPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedClass, setSelectedClass] = useState<string>('all')
 
   useEffect(() => {
     async function fetchStudents() {
       try {
+        setLoading(true)
+        setError(null)
+        
         const response = await fetch('/api/students')
         if (!response.ok) {
-          throw new Error('Failed to fetch students')
+          const data = await response.json()
+          throw new Error(data.message || 'Failed to fetch students')
         }
+        
         const data = await response.json()
         setStudents(data)
       } catch (error) {
@@ -54,140 +71,190 @@ export default function StudentsPage() {
       }
     }
 
-    if (session?.user?.email) {
+    if (session?.user?.email && status === 'authenticated') {
       fetchStudents()
     }
-  }, [session])
+  }, [session, status])
 
-  if (!session?.user?.email || session?.user?.role !== 'TEACHER') {
-    return (
-      <div className="text-center">
-        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-semibold text-gray-900">Access Denied</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Only teachers can access the students page.
-        </p>
-      </div>
+  // Get unique list of classes from all students
+  const classes = Array.from(
+    new Set(
+      students.flatMap(student => 
+        student.enrolledClasses.map(c => ({ id: c.id, name: c.name }))
+      )
     )
-  }
+  )
 
-  if (loading) {
+  // Filter students based on search query and selected class
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = 
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    const matchesClass = 
+      selectedClass === 'all' || 
+      student.enrolledClasses.some(c => c.id === selectedClass)
+
+    return matchesSearch && matchesClass
+  })
+
+  if (status === 'loading' || loading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-        <div className="h-10 bg-gray-200 rounded"></div>
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 bg-gray-200 rounded"></div>
+      <div className="space-y-6">
+        <div className="h-8 bg-gray-200 rounded w-1/4 animate-pulse"></div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-48 bg-gray-200 rounded animate-pulse"></div>
           ))}
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (status === 'unauthenticated') {
     return (
-      <div className="text-center">
-        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading students</h3>
-        <p className="mt-1 text-sm text-gray-500">{error}</p>
+      <div className="rounded-lg bg-white p-8 text-center">
+        <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-semibold text-gray-900">Access Denied</h3>
+        <p className="mt-1 text-sm text-gray-500">Please sign in to view this page.</p>
       </div>
     )
   }
 
-  const filteredStudents = students.filter(student => {
-    const searchLower = searchQuery.toLowerCase()
+  if (error) {
     return (
-      student.name?.toLowerCase().includes(searchLower) ||
-      student.email.toLowerCase().includes(searchLower)
+      <div className="rounded-lg bg-white p-8 text-center">
+        <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading students</h3>
+        <p className="mt-1 text-sm text-gray-500">{error}</p>
+        <div className="mt-6">
+          <Button 
+            onClick={() => {
+              setLoading(true)
+              setError(null)
+              window.location.reload()
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
     )
-  })
+  }
 
   return (
-    <div>
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="min-w-0 flex-1">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="sm:flex sm:items-center sm:justify-between">
+        <div>
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-            Students
+            Student Management
           </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage and monitor your students' progress across all classes
+          </p>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mt-4">
+      {/* Filters */}
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="relative">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-          </div>
-          <input
-            type="text"
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          <Input
+            type="search"
+            placeholder="Search students..."
+            className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search students..."
-            className="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
           />
         </div>
+        <select
+          value={selectedClass}
+          onChange={(e) => setSelectedClass(e.target.value)}
+          className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+        >
+          <option value="all">All Classes</option>
+          {classes.map((c: any) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Student List */}
-      <div className="mt-8 space-y-6">
-        {filteredStudents.length === 0 ? (
-          <div className="text-center py-12">
-            <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-semibold text-gray-900">No students found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchQuery ? 'Try adjusting your search query.' : 'Start by adding students to your classes.'}
-            </p>
-          </div>
-        ) : (
-          filteredStudents.map((student) => (
-            <div
-              key={student.id}
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
+      {/* Student Grid */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {filteredStudents.map((student) => (
+          <Card key={student.id}>
+            <CardHeader>
+              <CardTitle>{student.name}</CardTitle>
+              <CardDescription>{student.email}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Classes */}
+                <div className="flex items-center text-sm">
+                  <AcademicCapIcon className="mr-2 h-5 w-5 text-gray-400" />
+                  <span className="text-gray-600">
+                    {student.enrolledClasses.length} Classes Enrolled
+                  </span>
+                </div>
+
+                {/* Quiz Stats */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">
-                        {student.name || 'Unnamed Student'}
-                      </h3>
-                      <span className="ml-2 text-sm text-gray-500">{student.email}</span>
+                      <ChartBarIcon className="mr-2 h-5 w-5 text-gray-400" />
+                      <span className="text-gray-600">Average Score</span>
                     </div>
-                    <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <div className="flex items-center text-sm text-gray-500">
-                        <FolderIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" />
-                        {student.enrolledClasses.length} Classes:
-                        <span className="ml-1 text-gray-900">
-                          {student.enrolledClasses.map(c => c.name).join(', ')}
-                        </span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <AcademicCapIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" />
-                        {student.quizStats.totalAttempts} Quizzes Completed
-                        {student.quizStats.averageScore > 0 && (
-                          <span className="ml-1 text-gray-900">
-                            (Avg: {student.quizStats.averageScore}%)
-                          </span>
-                        )}
-                      </div>
-                      {student.quizStats.recentScore && (
-                        <div className="flex items-center text-sm text-gray-500">
-                          Latest Quiz: {student.quizStats.recentScore.quizTitle} -{' '}
-                          <span className="text-gray-900">
-                            {student.quizStats.recentScore.score}/{student.quizStats.recentScore.maxScore} (
-                            {Math.round((student.quizStats.recentScore.score / student.quizStats.recentScore.maxScore) * 100)}%)
-                          </span>
-                        </div>
-                      )}
+                    <span className="font-medium">{student.quizStats.averageScore}%</span>
+                  </div>
+                  <Progress value={student.quizStats.averageScore} />
+                </div>
+
+                {/* Recent Activity */}
+                {student.quizStats.recentScore && (
+                  <div className="rounded-md bg-gray-50 p-3">
+                    <div className="flex items-center text-sm">
+                      <ClockIcon className="mr-2 h-5 w-5 text-gray-400" />
+                      <span className="text-gray-600">Recent Quiz:</span>
+                    </div>
+                    <div className="mt-1 text-sm">
+                      <p className="font-medium text-gray-900">
+                        {student.quizStats.recentScore.quizTitle}
+                      </p>
+                      <p className="text-gray-500">
+                        Score: {student.quizStats.recentScore.score}/{student.quizStats.recentScore.maxScore}
+                      </p>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* View Details Button */}
+                <Button 
+                  className="w-full" 
+                  variant="outline" 
+                  asChild
+                >
+                  <Link href={`/dashboard/students/${student.id}`}>
+                    View Details
+                  </Link>
+                </Button>
               </div>
-            </div>
-          ))
-        )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
+
+      {filteredStudents.length === 0 && (
+        <div className="text-center py-12">
+          <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-semibold text-gray-900">No students found</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Try adjusting your search or filter criteria
+          </p>
+        </div>
+      )}
     </div>
   )
 } 

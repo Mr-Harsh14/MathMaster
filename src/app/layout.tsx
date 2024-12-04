@@ -10,6 +10,12 @@ export const metadata: Metadata = {
   description: 'An interactive platform for learning mathematics',
 }
 
+// These attributes are added by browser extensions like Grammarly
+const allowedAttributes = {
+  'data-new-gr-c-s-check-loaded': true,
+  'data-gr-ext-installed': true,
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -17,7 +23,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${inter.className} h-full bg-gray-50`}>
+      <body
+        className={`${inter.className} h-full bg-gray-50`}
+        {...allowedAttributes}
+        suppressHydrationWarning
+      >
         <Providers>
           <div className="min-h-full">
             {children}

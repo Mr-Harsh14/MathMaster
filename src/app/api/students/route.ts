@@ -25,7 +25,7 @@ export async function GET() {
       )
     }
 
-    // Get all students in teacher's classes
+    // Get all students in teacher's classes with detailed information
     const students = await prisma.user.findMany({
       where: {
         role: 'STUDENT',
@@ -49,8 +49,12 @@ export async function GET() {
           },
         },
         quizAttempts: {
-          orderBy: {
-            createdAt: 'desc',
+          where: {
+            quiz: {
+              class: {
+                teacherId: user.id,
+              },
+            },
           },
           select: {
             score: true,
@@ -58,14 +62,19 @@ export async function GET() {
             createdAt: true,
             quiz: {
               select: {
+                id: true,
                 title: true,
                 class: {
                   select: {
-                    teacherId: true,
+                    id: true,
+                    name: true,
                   },
                 },
               },
             },
+          },
+          orderBy: {
+            createdAt: 'desc',
           },
         },
       },
@@ -73,41 +82,44 @@ export async function GET() {
 
     // Process and format student data
     const formattedStudents = students.map(student => {
-      // Filter quiz attempts to only include quizzes from teacher's classes
-      const validAttempts = student.quizAttempts.filter(
-        attempt => attempt.quiz.class.teacherId === user.id
-      )
-
       // Calculate quiz statistics
-      const totalScore = validAttempts.reduce((sum, a) => sum + a.score, 0)
-      const totalMaxScore = validAttempts.reduce((sum, a) => sum + a.maxScore, 0)
+      const attempts = student.quizAttempts
+      const totalScore = attempts.reduce((sum, a) => sum + a.score, 0)
+      const totalMaxScore = attempts.reduce((sum, a) => sum + a.maxScore, 0)
       const averageScore = totalMaxScore > 0
         ? Math.round((totalScore / totalMaxScore) * 100)
         : 0
 
+      // Get most recent quiz attempt
+      const recentAttempt = attempts[0]
+      const recentScore = recentAttempt ? {
+        score: recentAttempt.score,
+        maxScore: recentAttempt.maxScore,
+        quizTitle: recentAttempt.quiz.title,
+        createdAt: recentAttempt.createdAt.toISOString(),
+      } : null
+
       return {
         id: student.id,
-        name: student.name,
+        name: student.name || 'Unnamed Student',
         email: student.email,
-        enrolledClasses: student.classesJoined,
+        enrolledClasses: student.classesJoined.map(c => ({
+          id: c.id,
+          name: c.name,
+        })),
         quizStats: {
-          totalAttempts: validAttempts.length,
+          totalAttempts: attempts.length,
           averageScore,
-          recentScore: validAttempts[0] ? {
-            score: validAttempts[0].score,
-            maxScore: validAttempts[0].maxScore,
-            quizTitle: validAttempts[0].quiz.title,
-            createdAt: validAttempts[0].createdAt,
-          } : null,
+          recentScore,
         },
       }
     })
 
     return NextResponse.json(formattedStudents)
   } catch (error) {
-    console.error('Error fetching students:', error)
+    console.error('Error in students API:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Failed to fetch students. Please try again.' },
       { status: 500 }
     )
   }
