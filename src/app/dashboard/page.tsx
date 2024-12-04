@@ -11,6 +11,7 @@ import {
   ClockIcon,
   TrophyIcon,
   ArrowTrendingUpIcon,
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline'
 import { Button } from '@/components/ui/button'
 
@@ -51,6 +52,10 @@ interface DashboardData {
     rank: number
     totalStudents: number
   }[]
+}
+
+function classNames(...classes: string[]) {
+  return classes.filter(Boolean).join(' ')
 }
 
 export default function DashboardPage() {
@@ -98,29 +103,42 @@ export default function DashboardPage() {
 
   if (error || !dashboardData) {
     return (
-      <div className="text-center">
+      <div className="rounded-lg bg-white p-8 text-center">
         <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
         <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading dashboard</h3>
         <p className="mt-1 text-sm text-gray-500">{error || 'Dashboard data not available'}</p>
+        <div className="mt-6">
+          <Button onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Message */}
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-            Welcome back, {session?.user?.name}!
-          </h2>
-        </div>
-        <div className="mt-4 flex md:ml-4 md:mt-0">
-          <Button asChild>
-            <Link href={isTeacher ? "/dashboard/classes" : "/dashboard/leaderboard"}>
-              {isTeacher ? 'Manage Classes' : 'View Leaderboard'}
-            </Link>
-          </Button>
+    <div className="space-y-8">
+      {/* Welcome Banner */}
+      <div className="bg-white shadow sm:rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <div className="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+                Welcome back, {session?.user?.name}!
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Here's what's happening in your {isTeacher ? 'classes' : 'learning journey'}
+              </p>
+            </div>
+            <div className="mt-4 sm:ml-4 sm:mt-0">
+              <Button asChild>
+                <Link href={isTeacher ? "/dashboard/classes" : "/dashboard/leaderboard"}>
+                  <span>{isTeacher ? 'Manage Classes' : 'View Leaderboard'}</span>
+                  <ArrowRightIcon className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -142,6 +160,15 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/students"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  View all students
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
             <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -157,6 +184,15 @@ export default function DashboardPage() {
                     </dl>
                   </div>
                 </div>
+              </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/classes"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  View all classes
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
               </div>
             </div>
 
@@ -174,6 +210,15 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/quizzes"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  View all quizzes
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
             <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -189,6 +234,15 @@ export default function DashboardPage() {
                     </dl>
                   </div>
                 </div>
+              </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/analytics"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  View analytics
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
               </div>
             </div>
           </>
@@ -210,6 +264,15 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/leaderboard"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  View leaderboard
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
             <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -225,6 +288,15 @@ export default function DashboardPage() {
                     </dl>
                   </div>
                 </div>
+              </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/classes"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  View classes
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
               </div>
             </div>
 
@@ -242,6 +314,15 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/classes"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  Take a quiz
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
             <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -257,6 +338,15 @@ export default function DashboardPage() {
                     </dl>
                   </div>
                 </div>
+              </div>
+              <div className="bg-gray-50 px-5 py-3">
+                <Link
+                  href="/dashboard/classes"
+                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
+                >
+                  View performance
+                  <ArrowRightIcon className="ml-1 h-4 w-4" />
+                </Link>
               </div>
             </div>
           </>
@@ -282,7 +372,8 @@ export default function DashboardPage() {
                       <div className="relative flex space-x-3">
                         <div>
                           <span
-                            className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                            className={classNames(
+                              'h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white',
                               activity.type === 'quiz'
                                 ? 'bg-blue-500'
                                 : activity.type === 'attempt'
@@ -290,7 +381,7 @@ export default function DashboardPage() {
                                 : activity.type === 'student'
                                 ? 'bg-purple-500'
                                 : 'bg-gray-500'
-                            }`}
+                            )}
                           >
                             {activity.type === 'quiz' ? (
                               <AcademicCapIcon className="h-5 w-5 text-white" />

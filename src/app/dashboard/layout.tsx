@@ -3,33 +3,41 @@
 import { Fragment, useState } from 'react'
 import { Dialog, Menu, Transition } from '@headlessui/react'
 import {
-  HomeIcon,
-  UsersIcon,
-  FolderIcon,
-  AcademicCapIcon,
-  ChartBarIcon,
-  XMarkIcon,
   Bars3Icon,
+  XMarkIcon,
+  ChartBarIcon,
+  HomeIcon,
+  AcademicCapIcon,
+  UserGroupIcon,
+  TrophyIcon,
+  UserIcon,
+  ArrowLeftOnRectangleIcon,
 } from '@heroicons/react/24/outline'
-import { signOut, useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-const teacherNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'My Classes', href: '/dashboard/classes', icon: FolderIcon },
-  { name: 'Students', href: '/dashboard/students', icon: UsersIcon },
-  { name: 'Quizzes', href: '/dashboard/quizzes', icon: AcademicCapIcon },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: ChartBarIcon },
-]
+function getNavigation(role: string) {
+  const baseNavigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+    { name: 'Classes', href: '/dashboard/classes', icon: AcademicCapIcon },
+  ]
 
-const studentNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'My Classes', href: '/dashboard/classes', icon: FolderIcon },
-  { name: 'Quizzes', href: '/dashboard/quizzes', icon: AcademicCapIcon },
-  { name: 'Leaderboard', href: '/dashboard/leaderboard', icon: ChartBarIcon },
-]
+  if (role === 'TEACHER') {
+    return [
+      ...baseNavigation,
+      { name: 'Students', href: '/dashboard/students', icon: UserGroupIcon },
+      { name: 'Quizzes', href: '/dashboard/quizzes', icon: ChartBarIcon },
+      { name: 'Analytics', href: '/dashboard/analytics', icon: TrophyIcon },
+    ]
+  }
+
+  return [
+    ...baseNavigation,
+    { name: 'Leaderboard', href: '/dashboard/leaderboard', icon: TrophyIcon },
+  ]
+}
 
 export default function DashboardLayout({
   children,
@@ -37,10 +45,10 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const pathname = usePathname()
   const { data: session } = useSession()
-  const isTeacher = session?.user?.role === 'TEACHER'
-  const navigation = isTeacher ? teacherNavigation : studentNavigation
+  const pathname = usePathname()
+
+  const navigation = getNavigation(session?.user?.role || 'STUDENT')
 
   return (
     <div>
@@ -69,32 +77,10 @@ export default function DashboardLayout({
               leaveTo="-translate-x-full"
             >
               <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
-                <Transition.Child
-                  as={Fragment}
-                  enter="ease-in-out duration-300"
-                  enterFrom="opacity-0"
-                  enterTo="opacity-100"
-                  leave="ease-in-out duration-300"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                >
-                  <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
-                    <button
-                      type="button"
-                      className="-m-2.5 p-2.5"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <span className="sr-only">Close sidebar</span>
-                      <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                    </button>
-                  </div>
-                </Transition.Child>
-                {/* Sidebar component for mobile */}
                 <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4">
                   <div className="flex h-16 shrink-0 items-center">
-                    <Link href="/dashboard" className="text-2xl font-bold text-indigo-600">
-                      MathMaster
-                    </Link>
+                    <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
+                    <span className="ml-2 text-xl font-bold">MathMaster</span>
                   </div>
                   <nav className="flex flex-1 flex-col">
                     <ul role="list" className="flex flex-1 flex-col gap-y-7">
@@ -139,9 +125,8 @@ export default function DashboardLayout({
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
           <div className="flex h-16 shrink-0 items-center">
-            <Link href="/dashboard" className="text-2xl font-bold text-indigo-600">
-              MathMaster
-            </Link>
+            <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
+            <span className="ml-2 text-xl font-bold">MathMaster</span>
           </div>
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
@@ -173,6 +158,41 @@ export default function DashboardLayout({
                   ))}
                 </ul>
               </li>
+              <li className="mt-auto">
+                <Menu as="div" className="relative">
+                  <Menu.Button className="flex items-center gap-x-4 px-2 py-3 text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-50 rounded-md w-full">
+                    <UserIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+                    <span className="sr-only">Your profile</span>
+                    <span aria-hidden="true">{session?.user?.name}</span>
+                  </Menu.Button>
+                  <Transition
+                    as={Fragment}
+                    enter="transition ease-out duration-100"
+                    enterFrom="transform opacity-0 scale-95"
+                    enterTo="transform opacity-100 scale-100"
+                    leave="transition ease-in duration-75"
+                    leaveFrom="transform opacity-100 scale-100"
+                    leaveTo="transform opacity-0 scale-95"
+                  >
+                    <Menu.Items className="absolute bottom-full left-0 z-10 mb-2 w-full origin-bottom-left rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={() => signOut()}
+                            className={cn(
+                              active ? 'bg-gray-50' : '',
+                              'flex w-full items-center gap-x-4 px-3 py-2 text-sm text-gray-900'
+                            )}
+                          >
+                            <ArrowLeftOnRectangleIcon className="h-5 w-5 text-gray-400" />
+                            Sign out
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </Menu.Items>
+                  </Transition>
+                </Menu>
+              </li>
             </ul>
           </nav>
         </div>
@@ -180,71 +200,63 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <div className="lg:pl-72">
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
-          <button
-            type="button"
-            className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <span className="sr-only">Open sidebar</span>
-            <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-          </button>
+        <div className="sticky top-0 z-40 lg:mx-auto">
+          <div className="flex h-16 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-0 lg:shadow-none">
+            <button
+              type="button"
+              className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <span className="sr-only">Open sidebar</span>
+              <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+            </button>
 
-          {/* Separator */}
-          <div className="h-6 w-px bg-gray-200 lg:hidden" aria-hidden="true" />
+            {/* Separator */}
+            <div className="h-6 w-px bg-gray-200 lg:hidden" aria-hidden="true" />
 
-          <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <div className="flex flex-1" />
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
-              {/* Profile dropdown */}
-              <Menu as="div" className="relative">
-                <Menu.Button className="-m-1.5 flex items-center p-1.5">
-                  <span className="sr-only">Open user menu</span>
-                  <div className="flex items-center gap-x-4">
-                    <div className="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center">
-                      <span className="text-sm font-medium leading-6 text-white">
-                        {session?.user?.name?.[0] || session?.user?.email?.[0] || '?'}
-                      </span>
-                    </div>
-                    <span className="hidden lg:flex lg:items-center">
-                      <span className="text-sm font-semibold leading-6 text-gray-900" aria-hidden="true">
-                        {session?.user?.name || session?.user?.email}
-                      </span>
-                    </span>
-                  </div>
-                </Menu.Button>
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-100"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-75"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute right-0 z-10 mt-2.5 w-32 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none">
-                    <Menu.Item>
-                      {({ active }) => (
-                        <button
-                          onClick={() => signOut({ callbackUrl: '/' })}
-                          className={cn(
-                            active ? 'bg-gray-50' : '',
-                            'block w-full px-3 py-1 text-sm leading-6 text-gray-900 text-left'
-                          )}
-                        >
-                          Sign out
-                        </button>
-                      )}
-                    </Menu.Item>
-                  </Menu.Items>
-                </Transition>
-              </Menu>
+            <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+              <div className="flex items-center gap-x-4 lg:gap-x-6 ml-auto">
+                {/* Profile dropdown - Mobile only */}
+                <Menu as="div" className="relative lg:hidden">
+                  <Menu.Button className="-m-1.5 flex items-center p-1.5">
+                    <span className="sr-only">Open user menu</span>
+                    <UserIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+                  </Menu.Button>
+                  <Transition
+                    as={Fragment}
+                    enter="transition ease-out duration-100"
+                    enterFrom="transform opacity-0 scale-95"
+                    enterTo="transform opacity-100 scale-100"
+                    leave="transition ease-in duration-75"
+                    leaveFrom="transform opacity-100 scale-100"
+                    leaveTo="transform opacity-0 scale-95"
+                  >
+                    <Menu.Items className="absolute right-0 z-10 mt-2.5 w-32 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none">
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={() => signOut()}
+                            className={cn(
+                              active ? 'bg-gray-50' : '',
+                              'block px-3 py-1 text-sm leading-6 text-gray-900 w-full text-left'
+                            )}
+                          >
+                            Sign out
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </Menu.Items>
+                  </Transition>
+                </Menu>
+              </div>
             </div>
           </div>
         </div>
 
         <main className="py-10">
-          <div className="px-4 sm:px-6 lg:px-8">{children}</div>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
         </main>
       </div>
     </div>
