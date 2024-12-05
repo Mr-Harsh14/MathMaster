@@ -8,6 +8,11 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'MathMaster - Learn Mathematics',
   description: 'An interactive platform for learning mathematics',
+  icons: {
+    icon: '/images/hazz.png',
+    shortcut: '/images/hazz.png',
+    apple: '/images/hazz.png',
+  },
 }
 
 // These attributes are added by browser extensions like Grammarly
