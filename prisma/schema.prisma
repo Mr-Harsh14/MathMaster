@@ -47,7 +47,7 @@ model Quiz {
 model Question {
   id          String    @id @default(cuid())
   quizId      String
-  quiz        Quiz      @relation(fields: [quizId], references: [id])
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
   question    String
   options     String[]
   answer      String
@@ -61,7 +61,7 @@ model Score {
   userId      String
   user        User      @relation(fields: [userId], references: [id])
   quizId      String
-  quiz        Quiz      @relation(fields: [quizId], references: [id])
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
   score       Int
   maxScore    Int
   createdAt   DateTime  @default(now())

@@ -68,7 +68,6 @@ export default function QuizList({ classId }: { classId: string }) {
         throw new Error(data.message || "Failed to delete quiz");
       }
 
-      // Remove the deleted quiz from the state
       setQuizzes(prevQuizzes => prevQuizzes.filter(q => q.id !== quizId));
     } catch (error) {
       console.error("Error deleting quiz:", error);
@@ -113,10 +112,10 @@ export default function QuizList({ classId }: { classId: string }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {quizzes.map((quiz) => (
-        <Card key={quiz.id} className="p-4">
+        <Card key={quiz.id} className="p-4 bg-white">
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{quiz.title}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{quiz.title}</h3>
               {isTeacher && (
                 <Button
                   variant="destructive"
@@ -129,14 +128,19 @@ export default function QuizList({ classId }: { classId: string }) {
               )}
             </div>
             
-            <div className="flex items-center space-x-4 text-sm text-gray-500">
-              <div>Questions: {quiz._count.questions}</div>
-              <div>Attempts: {quiz._count.scores}</div>
+            <div className="flex items-center space-x-4">
+              <div className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                {quiz._count.questions} Questions
+              </div>
+              <div className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                {quiz._count.scores} Attempts
+              </div>
             </div>
 
             <Button
               variant="outline"
               onClick={() => router.push(`/dashboard/classes/${classId}/quizzes/${quiz.id}`)}
+              className="w-full"
             >
               {isTeacher ? "Edit Quiz" : "Take Quiz"}
             </Button>
