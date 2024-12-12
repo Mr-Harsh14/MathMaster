@@ -15,17 +15,44 @@ A modern web application for learning mathematics through interactive quizzes an
 - Next.js 14 with App Router
 - TypeScript
 - Tailwind CSS
-- Prisma ORM
-- PostgreSQL
+- MongoDB
 - NextAuth.js for authentication
 
-## Prerequisites
+## Deployment to Vercel
 
-- Node.js 18+ 
-- PostgreSQL
-- npm or yarn
+1. Create a MongoDB Atlas account and database:
+   - Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
+   - Create a new cluster (free tier is fine)
+   - Create a database user
+   - Get your MongoDB connection string
+   - Add your IP address to the IP whitelist (or allow access from anywhere for development)
 
-## Getting Started
+2. Set up your project on Vercel:
+   - Fork this repository to your GitHub account
+   - Go to [Vercel](https://vercel.com)
+   - Create a new project
+   - Import your forked repository
+   - Add the following environment variables in Vercel:
+     ```
+     MONGODB_URI=your-mongodb-atlas-uri
+     NEXTAUTH_SECRET=your-secret-key
+     NEXTAUTH_URL=https://your-vercel-domain.vercel.app
+     ```
+   - Deploy!
+
+3. Update your MongoDB connection string:
+   - Replace `your-mongodb-atlas-uri` with your actual MongoDB Atlas connection string
+   - Make sure to replace `<password>` in the connection string with your actual database user password
+
+4. Generate a secure NEXTAUTH_SECRET:
+   - You can generate one by running `openssl rand -base64 32` in your terminal
+   - Or use any other secure random string generator
+
+5. Update NEXTAUTH_URL:
+   - After your first deployment, update this to your actual Vercel domain
+   - Format: `https://your-app-name.vercel.app`
+
+## Local Development
 
 1. Clone the repository:
    ```bash
@@ -40,20 +67,14 @@ A modern web application for learning mathematics through interactive quizzes an
 
 3. Set up your environment variables:
    - Copy `.env.example` to `.env`
-   - Update the database connection string and other variables
+   - Update the variables with your values
 
-4. Set up the database:
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-
-5. Run the development server:
+4. Run the development server:
    ```bash
    npm run dev
    ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Project Structure
 
