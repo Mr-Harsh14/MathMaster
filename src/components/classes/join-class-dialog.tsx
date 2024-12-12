@@ -39,8 +39,21 @@ export default function JoinClassDialog({
         throw new Error(error.message || 'Failed to join class')
       }
 
-      router.refresh()
+      // Close dialog and refresh data
       onClose()
+      router.refresh()
+      
+      // Invalidate and refetch data
+      const refreshResponse = await fetch('/api/classes', {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      })
+      
+      if (refreshResponse.ok) {
+        router.refresh()
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Something went wrong')
     } finally {

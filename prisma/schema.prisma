@@ -36,7 +36,7 @@ model Quiz {
   id          String    @id @default(cuid())
   title       String
   classId     String
-  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class       Class     @relation(fields: [classId], references: [id])
   questions   Question[]
   scores      Score[]
   timeLimit   Int?      // Time limit in minutes, null means no limit

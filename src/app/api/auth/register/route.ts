@@ -1,110 +1,58 @@
+import { hash } from "bcryptjs"
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { prisma } from "@/lib/prisma"
 
 export async function POST(req: Request) {
   try {
-    console.log('Starting registration process...')
-    
-    const body = await req.json()
-    console.log('Received registration data:', { ...body, password: '[REDACTED]' })
-    
-    const { name, email, password, role } = body
+    const { name, email, password, role } = await req.json()
 
     // Validate input
     if (!name || !email || !password || !role) {
-      console.log('Missing required fields:', { 
-        hasName: !!name, 
-        hasEmail: !!email, 
-        hasPassword: !!password, 
-        hasRole: !!role 
-      })
       return NextResponse.json(
         { message: "Missing required fields" },
         { status: 400 }
       )
     }
 
-    // Validate role
-    if (!['STUDENT', 'TEACHER'].includes(role)) {
-      console.log('Invalid role:', role, 'Valid roles:', ['STUDENT', 'TEACHER'])
-      return NextResponse.json(
-        { message: "Invalid role" },
-        { status: 400 }
-      )
-    }
-
     // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    })
 
     if (existingUser) {
       return NextResponse.json(
-        { message: "Email already registered" },
+        { message: "User already exists" },
         { status: 400 }
       )
     }
 
-    // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-          role
-        },
-        emailRedirectTo: `${process.env.NEXTAUTH_URL}/auth/login`
+    // Hash password
+    const hashedPassword = await hash(password, 12)
+
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role,
       }
-    })
-
-    if (authError) {
-      console.error('Auth error:', authError)
-      return NextResponse.json(
-        { message: authError.message },
-        { status: 400 }
-      )
-    }
-
-    if (!authData.user) {
-      return NextResponse.json(
-        { message: "Failed to create user" },
-        { status: 500 }
-      )
-    }
-
-    // The user profile will be created automatically by the database trigger
-    console.log('User registration successful:', { 
-      id: authData.user.id, 
-      email: authData.user.email,
-      role: role
     })
 
     return NextResponse.json(
       {
         user: {
-          id: authData.user.id,
-          name,
-          email,
-          role,
+          name: user.name,
+          email: user.email,
+          role: user.role,
         }
       },
       { status: 201 }
     )
-  } catch (error: unknown) {
-    console.error("Registration error details:", {
-      error,
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    })
-
+  } catch (error) {
+    console.error("Registration error:", error)
     return NextResponse.json(
-      { 
-        message: "Registration failed", 
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { message: "Something went wrong" },
       { status: 500 }
     )
   }

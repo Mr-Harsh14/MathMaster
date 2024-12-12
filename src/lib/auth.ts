@@ -2,14 +2,17 @@ import { AuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
 import { prisma } from './prisma'
+import { PrismaAdapter } from '@auth/prisma-adapter'
 
 export const authOptions: AuthOptions = {
+  adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt'
   },
   pages: {
     signIn: '/auth/login',
     newUser: '/auth/register',
+    error: '/auth/error',
   },
   providers: [
     CredentialsProvider({
@@ -56,6 +59,7 @@ export const authOptions: AuthOptions = {
       if (user) {
         return {
           ...token,
+          id: user.id,
           role: user.role,
         }
       }
@@ -66,6 +70,7 @@ export const authOptions: AuthOptions = {
         ...session,
         user: {
           ...session.user,
+          id: token.id,
           role: token.role,
         },
       }

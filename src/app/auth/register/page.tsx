@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Logo } from '@/components/ui/logo'
@@ -21,32 +21,24 @@ export default function RegisterPage() {
     const name = formData.get('name') as string
     const email = formData.get('email') as string
     const password = formData.get('password') as string
+    const role = formData.get('role') as string
 
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          role: 'STUDENT',
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, role }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to register')
+        throw new Error(data.message || 'Something went wrong')
       }
 
-      // Redirect to login page
       router.push('/auth/login?registered=true')
     } catch (error) {
-      console.error('Registration error:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong')
+      setError(error instanceof Error ? error.message : 'Failed to register')
     } finally {
       setLoading(false)
     }
@@ -59,16 +51,12 @@ export default function RegisterPage() {
           <Logo size={48} />
         </div>
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-          Create a Student Account
+          Create your account
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <Link href="/auth/login" className="font-medium text-indigo-600 hover:text-indigo-500">
             sign in to your account
-          </Link>
-          {' • '}
-          <Link href="/auth/teacher/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-            register as a teacher
           </Link>
         </p>
       </div>
@@ -81,10 +69,10 @@ export default function RegisterPage() {
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
-            
+
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full Name
+                Full name
               </label>
               <div className="mt-1">
                 <Input
@@ -125,9 +113,25 @@ export default function RegisterPage() {
                   type="password"
                   autoComplete="new-password"
                   required
-                  minLength={6}
                   className="block w-full"
                 />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                I am a
+              </label>
+              <div className="mt-1">
+                <select
+                  id="role"
+                  name="role"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
+                >
+                  <option value="STUDENT">Student</option>
+                  <option value="TEACHER">Teacher</option>
+                </select>
               </div>
             </div>
 
