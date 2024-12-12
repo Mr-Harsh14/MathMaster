@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { connectDB } from '@/lib/mongodb'
 import User from '@/models/User'
 import Class, { IClass } from '@/models/Class'
-import Quiz from '@/models/Quiz'
+import Quiz, { IQuiz } from '@/models/Quiz'
 import Score from '@/models/Score'
 import { Types } from 'mongoose'
 
@@ -21,21 +21,31 @@ interface QuestionDoc {
   explanation?: string;
 }
 
-interface LeanQuizDocument {
+// Define the shape of a populated score in a quiz
+interface PopulatedScore {
   _id: Types.ObjectId;
-  title: string;
-  class: Types.ObjectId;
-  questions: QuestionDoc[];
-  scores?: Array<{
-    _id: Types.ObjectId;
-    user: PopulatedUser;
-    score: number;
-    maxScore: number;
-    createdAt: Date;
-  }>;
+  user: PopulatedUser;
+  score: number;
+  maxScore: number;
+  createdAt: Date;
 }
 
-interface LeanScoreDocument {
+// Define the shape of a quiz document after population and lean
+interface PopulatedQuizDocument {
+  _id: Types.ObjectId;
+  title: string;
+  description?: string;
+  class: Types.ObjectId;
+  questions: QuestionDoc[];
+  timeLimit?: number;
+  scores?: PopulatedScore[];
+  createdAt: Date;
+  updatedAt: Date;
+  __v: number;
+}
+
+// Define the shape of a score document after population and lean
+interface PopulatedScoreDocument {
   _id: Types.ObjectId;
   user: PopulatedUser;
   quiz: {
@@ -45,9 +55,12 @@ interface LeanScoreDocument {
   score: number;
   maxScore: number;
   createdAt: Date;
+  updatedAt: Date;
+  __v: number;
 }
 
-interface LeanClassDocument {
+// Define the shape of a class document after population and lean
+interface PopulatedClassDocument {
   _id: Types.ObjectId;
   name: string;
   code: string;
@@ -92,7 +105,7 @@ export async function GET(
     })
     .populate('teacher', 'name email')
     .populate('students', 'name email')
-    .lean() as LeanClassDocument
+    .lean() as PopulatedClassDocument
 
     if (!classData) {
       return NextResponse.json(
@@ -110,7 +123,8 @@ export async function GET(
           select: 'name email'
         }
       })
-      .lean() as LeanQuizDocument[]
+      .lean()
+      .then(docs => docs as PopulatedQuizDocument[])
 
     // Get recent activity (quiz attempts)
     const recentScores = await Score.find({
@@ -123,7 +137,8 @@ export async function GET(
     })
     .sort({ createdAt: -1 })
     .limit(5)
-    .lean() as LeanScoreDocument[]
+    .lean()
+    .then(docs => docs as PopulatedScoreDocument[])
 
     // Calculate class statistics
     let totalScore = 0
