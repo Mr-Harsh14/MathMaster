@@ -15,8 +15,15 @@ A modern web application for learning mathematics through interactive quizzes an
 - Next.js 14 with App Router
 - TypeScript
 - Tailwind CSS
-- MongoDB
+- MongoDB with Mongoose
 - NextAuth.js for authentication
+
+## Project Structure
+
+- `/src/app` - Next.js app router pages
+- `/src/components` - Reusable React components
+- `/src/lib` - Utility functions and shared logic
+- `/src/models` - MongoDB schema definitions
 
 ## Deployment to Vercel
 
@@ -75,13 +82,6 @@ A modern web application for learning mathematics through interactive quizzes an
    ```
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Project Structure
-
-- `/src/app` - Next.js app router pages
-- `/src/components` - Reusable React components
-- `/src/lib` - Utility functions and shared logic
-- `/prisma` - Database schema and migrations
 
 ## Contributing
 
