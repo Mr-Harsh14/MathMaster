@@ -55,7 +55,11 @@ export default function LoginPage() {
         <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <Link href="/auth/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-            create a new account
+            create a student account
+          </Link>
+          {' • '}
+          <Link href="/auth/teacher/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+            create a teacher account
           </Link>
         </p>
       </div>

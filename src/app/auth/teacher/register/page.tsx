@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Logo } from '@/components/ui/logo'
 
-export default function RegisterPage() {
+export default function TeacherRegisterPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -32,7 +32,7 @@ export default function RegisterPage() {
           name,
           email,
           password,
-          role: 'STUDENT',
+          role: 'TEACHER',
         }),
       })
 
@@ -56,16 +56,12 @@ export default function RegisterPage() {
           <Logo size={48} />
         </div>
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-          Create a Student Account
+          Create a Teacher Account
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <Link href="/auth/login" className="font-medium text-indigo-600 hover:text-indigo-500">
             sign in to your account
-          </Link>
-          {' • '}
-          <Link href="/auth/teacher/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-            register as a teacher
           </Link>
         </p>
       </div>
