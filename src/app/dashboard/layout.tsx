@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { Dialog, Menu, Transition } from '@headlessui/react'
 import {
   Bars3Icon,
@@ -49,8 +49,29 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const { data: session } = useSession()
-  const navigation = getNavigation(session?.user?.role || 'STUDENT')
+  const [userRole, setUserRole] = useState<string>('STUDENT')
+  const navigation = getNavigation(userRole)
   const displayName = session?.user?.name || session?.user?.email || 'User'
+
+  useEffect(() => {
+    async function checkUserRole() {
+      try {
+        const response = await fetch('/api/auth/check-role')
+        if (!response.ok) {
+          throw new Error('Failed to check role')
+        }
+        const data = await response.json()
+        setUserRole(data.role || 'STUDENT')
+      } catch (error) {
+        console.error('Error checking role:', error)
+        setUserRole('STUDENT')
+      }
+    }
+
+    if (session?.user?.email) {
+      checkUserRole()
+    }
+  }, [session])
 
   return (
     <div>
