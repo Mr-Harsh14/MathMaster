@@ -3,6 +3,7 @@ import { compare } from "bcryptjs"
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
+import { User } from "@prisma/client"
 
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
