@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { connectDB } from '@/lib/mongodb'
 import User from '@/models/User'
-import Class from '@/models/Class'
+import Class, { IClass } from '@/models/Class'
 import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
 
@@ -35,7 +35,7 @@ export async function GET() {
       .populate({
         path: 'students',
       })
-      .lean()
+      .lean() as (IClass & { _id: string })[]
 
     // Get all quizzes for these classes
     const classIds = classes.map(c => c._id)
@@ -83,7 +83,7 @@ export async function GET() {
         averageScore: classMaxScore > 0
           ? Math.round((classScore / classMaxScore) * 100)
           : 0,
-        totalStudents: c.students.length,
+        totalStudents: c.students?.length || 0,
         totalQuizzes: classQuizzes.length,
       }
     }))
@@ -93,7 +93,14 @@ export async function GET() {
       quiz: { $in: quizzes.map(q => q._id) }
     })
     .populate('user', 'name email')
-    .populate('quiz', 'title')
+    .populate({
+      path: 'quiz',
+      select: 'title',
+      populate: {
+        path: 'class',
+        select: 'name'
+      }
+    })
     .sort({ createdAt: -1 })
     .limit(10)
     .lean()
