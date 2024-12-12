@@ -5,11 +5,58 @@ import User from '@/models/User'
 import Class from '@/models/Class'
 import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
+import { Types } from 'mongoose'
 
 interface RouteParams {
   params: {
     id: string
   }
+}
+
+interface MongoDBUser {
+  _id: Types.ObjectId;
+  name?: string;
+  email: string;
+  role: string;
+  __v: number;
+}
+
+interface MongoDBClass {
+  _id: Types.ObjectId;
+  name: string;
+  teacher: Types.ObjectId;
+  students: Types.ObjectId[];
+  __v: number;
+}
+
+interface MongoDBQuiz {
+  _id: Types.ObjectId;
+  title: string;
+  class: Types.ObjectId;
+  questions: Array<{
+    _id: Types.ObjectId;
+    question: string;
+    options: string[];
+    answer: string;
+  }>;
+  __v: number;
+}
+
+interface MongoDBScore {
+  _id: Types.ObjectId;
+  user: Types.ObjectId;
+  quiz: {
+    _id: Types.ObjectId;
+    title: string;
+    class: {
+      _id: Types.ObjectId;
+      name: string;
+    };
+  };
+  score: number;
+  maxScore: number;
+  createdAt: Date;
+  __v: number;
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
@@ -24,7 +71,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     await connectDB()
-    const user = await User.findOne({ email: session.user.email })
+    const user = await User.findOne({ email: session.user.email }).lean() as MongoDBUser
 
     if (!user || user.role !== 'TEACHER') {
       return NextResponse.json(
@@ -34,7 +81,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     // Get student details
-    const student = await User.findById(params.id).lean()
+    const student = await User.findById(params.id).lean() as MongoDBUser
 
     if (!student) {
       return NextResponse.json(
@@ -46,12 +93,12 @@ export async function GET(request: Request, { params }: RouteParams) {
     // Get all classes where this student is enrolled
     const enrolledClasses = await Class.find({
       students: student._id
-    }).lean()
+    }).lean() as MongoDBClass[]
 
     // Get all quizzes for these classes
     const quizzes = await Quiz.find({
       class: { $in: enrolledClasses.map(c => c._id) }
-    }).lean()
+    }).lean() as MongoDBQuiz[]
 
     // Get all scores for this student
     const scores = await Score.find({ user: student._id })
@@ -64,7 +111,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         }
       })
       .sort({ createdAt: -1 })
-      .lean()
+      .lean() as MongoDBScore[]
 
     // Calculate overall statistics
     const totalScore = scores.reduce((sum, score) => sum + score.score, 0)
