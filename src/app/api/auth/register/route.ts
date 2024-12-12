@@ -1,7 +1,7 @@
 import { hash } from "bcryptjs"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { UserRole } from "@prisma/client"
+import { UserRole, Prisma } from "@prisma/client"
 
 export async function POST(req: Request) {
   try {
@@ -76,19 +76,23 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     )
-  } catch (error) {
-    console.error("Registration error details:", {
-      name: error?.name,
-      message: error?.message,
-      stack: error?.stack,
-      error
-    })
+  } catch (error: unknown) {
+    // Type guard for Error objects
+    if (error instanceof Error) {
+      console.error("Registration error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      })
+    } else {
+      console.error("Unknown error type:", error)
+    }
     
-    // Check for specific Prisma errors
-    if (error?.name === 'PrismaClientKnownRequestError') {
-      console.error('Prisma error code:', error?.code)
+    // Check for Prisma errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.error('Prisma error code:', error.code)
       // Handle specific Prisma errors
-      if (error?.code === 'P2002') {
+      if (error.code === 'P2002') {
         return NextResponse.json(
           { message: "Email already exists" },
           { status: 400 }
@@ -100,7 +104,7 @@ export async function POST(req: Request) {
       { 
         message: "Something went wrong", 
         error: error instanceof Error ? error.message : 'Unknown error',
-        errorType: error?.name || 'Unknown error type'
+        errorType: error instanceof Error ? error.name : 'Unknown error type'
       },
       { status: 500 }
     )
