@@ -34,6 +34,27 @@ export default function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isTeacher, setIsTeacher] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    async function checkTeacherStatus() {
+      try {
+        const response = await fetch('/api/auth/check-role')
+        if (!response.ok) {
+          throw new Error('Failed to check role')
+        }
+        const data = await response.json()
+        setIsTeacher(data.role === 'TEACHER')
+      } catch (error) {
+        console.error('Error checking role:', error)
+        setIsTeacher(false)
+      }
+    }
+
+    if (session?.user?.email) {
+      checkTeacherStatus()
+    }
+  }, [session])
 
   useEffect(() => {
     async function fetchAnalytics() {
@@ -54,12 +75,12 @@ export default function AnalyticsPage() {
       }
     }
 
-    if (session?.user?.email) {
+    if (session?.user?.email && isTeacher) {
       fetchAnalytics()
     }
-  }, [session])
+  }, [session, isTeacher])
 
-  if (!session?.user?.email || session?.user?.role !== 'TEACHER') {
+  if (!session?.user?.email || isTeacher === false) {
     return (
       <div className="text-center">
         <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -71,7 +92,7 @@ export default function AnalyticsPage() {
     )
   }
 
-  if (loading) {
+  if (loading || isTeacher === null) {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 bg-gray-200 rounded w-1/4"></div>
