@@ -36,13 +36,16 @@ export default function RegisterPage() {
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.message || 'Failed to register')
       }
 
-      router.push('/auth/login')
+      // Redirect to login page
+      router.push('/auth/login?registered=true')
     } catch (error) {
+      console.error('Registration error:', error)
       setError(error instanceof Error ? error.message : 'Something went wrong')
     } finally {
       setLoading(false)
@@ -122,6 +125,7 @@ export default function RegisterPage() {
                   type="password"
                   autoComplete="new-password"
                   required
+                  minLength={6}
                   className="block w-full"
                 />
               </div>
