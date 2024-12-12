@@ -5,8 +5,8 @@
   "framework": "nextjs",
   "regions": ["iad1"],
   "env": {
-    "NEXTAUTH_URL": "DEPLOYMENT_URL",
-    "DATABASE_URL": "YOUR_POSTGRES_URL",
-    "NEXTAUTH_SECRET": "YOUR_SECRET"
+    "NEXTAUTH_URL": "https://math-app-mr-harsh14.vercel.app",
+    "DATABASE_URL": "postgres://postgres.siorndayppdmqszmtdfh:Nansha%406581@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
+    "NEXTAUTH_SECRET": "7YFzQFP5AIm521H9SZI7B8MeVkLKgkqS5jw1DmPwTV8="
   }
 } 
