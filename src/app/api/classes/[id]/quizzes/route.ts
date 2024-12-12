@@ -3,7 +3,36 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/mongodb'
 import User from '@/models/User'
 import Class from '@/models/Class'
-import Quiz from '@/models/Quiz'
+import Quiz, { IQuiz } from '@/models/Quiz'
+import { Types } from 'mongoose'
+
+interface QuestionDoc {
+  _id: Types.ObjectId;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation?: string;
+}
+
+interface LeanQuizDocument {
+  _id: Types.ObjectId;
+  title: string;
+  description?: string;
+  class: Types.ObjectId;
+  questions: QuestionDoc[];
+  timeLimit?: number;
+  scores?: Array<{
+    _id: Types.ObjectId;
+    user: {
+      _id: Types.ObjectId;
+      name?: string;
+      email: string;
+    };
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+  __v: number;
+}
 
 export async function GET(
   req: Request,
@@ -48,14 +77,14 @@ export async function GET(
           select: 'name email'
         }
       })
-      .lean()
+      .lean() as LeanQuizDocument[]
 
     // Format quizzes
     const formattedQuizzes = quizzes.map(quiz => ({
       id: quiz._id,
       title: quiz.title,
       timeLimit: quiz.timeLimit,
-      questions: quiz.questions.map(q => ({
+      questions: quiz.questions.map((q: QuestionDoc) => ({
         id: q._id,
         question: q.question,
         options: q.options,
