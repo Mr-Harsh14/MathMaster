@@ -5,6 +5,12 @@ import User from '@/models/User'
 import Class, { IClass } from '@/models/Class'
 import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
+import { Types } from 'mongoose'
+
+interface ClassWithId extends Omit<IClass, '_id'> {
+  _id: Types.ObjectId;
+  students: Array<{ _id: Types.ObjectId; name?: string; email?: string }>;
+}
 
 export async function GET() {
   try {
@@ -32,10 +38,8 @@ export async function GET() {
 
     // Get teacher's classes with their quizzes and scores
     const classes = await Class.find({ teacher: user._id })
-      .populate({
-        path: 'students',
-      })
-      .lean() as (IClass & { _id: string })[]
+      .populate('students')
+      .lean() as ClassWithId[]
 
     // Get all quizzes for these classes
     const classIds = classes.map(c => c._id)
