@@ -21,6 +21,11 @@ import {
   ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline'
 
+interface Class {
+  id: string
+  name: string
+}
+
 interface Student {
   id: string
   name: string
