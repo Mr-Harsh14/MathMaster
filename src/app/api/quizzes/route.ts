@@ -5,6 +5,38 @@ import User from '@/models/User'
 import Class from '@/models/Class'
 import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
+import { Types } from 'mongoose'
+
+interface PopulatedUser {
+  _id: Types.ObjectId;
+  name?: string;
+  email: string;
+}
+
+interface QuizScore {
+  _id: Types.ObjectId;
+  user: PopulatedUser;
+  score: number;
+  maxScore: number;
+  createdAt: Date;
+}
+
+interface PopulatedQuiz {
+  _id: Types.ObjectId;
+  title: string;
+  class: {
+    _id: Types.ObjectId;
+    name: string;
+  };
+  questions: Array<{
+    _id: Types.ObjectId;
+    question: string;
+    options: string[];
+    answer: string;
+  }>;
+  scores?: QuizScore[];
+  createdAt: Date;
+}
 
 export async function GET() {
   try {
@@ -40,20 +72,20 @@ export async function GET() {
           select: 'name email'
         }
       })
-      .lean()
+      .lean() as PopulatedQuiz[]
 
     // Process quiz data
     const processedQuizzes = quizzes.map(quiz => {
       const attempts = quiz.scores || []
-      const totalScore = attempts.reduce((sum, score) => sum + score.score, 0)
-      const totalMaxScore = attempts.reduce((sum, score) => sum + score.maxScore, 0)
+      const totalScore = attempts.reduce((sum: number, score) => sum + score.score, 0)
+      const totalMaxScore = attempts.reduce((sum: number, score) => sum + score.maxScore, 0)
       const averageScore = totalMaxScore > 0
         ? Math.round((totalScore / totalMaxScore) * 100)
         : 0
 
       // Get most recent attempt
       const recentAttempt = attempts.length > 0
-        ? attempts.reduce((latest, current) => 
+        ? attempts.reduce((latest: QuizScore, current: QuizScore) => 
             new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
           )
         : null
