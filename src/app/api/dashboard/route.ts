@@ -5,6 +5,46 @@ import User from '@/models/User'
 import Class from '@/models/Class'
 import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
+import { Types } from 'mongoose'
+
+interface PopulatedUser {
+  _id: Types.ObjectId;
+  name?: string;
+  email: string;
+}
+
+interface PopulatedClass {
+  _id: Types.ObjectId;
+  students: Array<{ _id: Types.ObjectId }>;
+  teacher: PopulatedUser;
+  name: string;
+  __v: number;
+}
+
+interface PopulatedScore {
+  _id: Types.ObjectId;
+  user: PopulatedUser;
+  quiz: {
+    _id: Types.ObjectId;
+    title: string;
+    class: {
+      name: string;
+    };
+  };
+  score: number;
+  maxScore: number;
+  createdAt: Date;
+}
+
+interface PopulatedQuiz {
+  _id: Types.ObjectId;
+  scores?: Array<{
+    _id: Types.ObjectId;
+    user: PopulatedUser;
+    score: number;
+    maxScore: number;
+  }>;
+}
 
 export async function GET() {
   try {
@@ -36,19 +76,22 @@ export async function GET() {
         : { students: user._id }
     )
     .populate('teacher', 'name email')
-    .lean()
+    .lean() as PopulatedClass[]
 
     // Get total students if teacher
     let totalStudents = 0
     if (isTeacher) {
-      const uniqueStudentIds = new Set()
+      const uniqueStudentIds = new Set<string>()
       for (const cls of classes) {
         const classWithStudents = await Class.findById(cls._id)
           .populate('students', '_id')
-          .lean()
-        classWithStudents.students.forEach((student: any) => {
-          uniqueStudentIds.add(student._id.toString())
-        })
+          .lean() as PopulatedClass | null
+
+        if (classWithStudents?.students) {
+          classWithStudents.students.forEach(student => {
+            uniqueStudentIds.add(student._id.toString())
+          })
+        }
       }
       totalStudents = uniqueStudentIds.size
     }
@@ -64,7 +107,7 @@ export async function GET() {
           select: 'name email'
         }
       })
-      .lean()
+      .lean() as PopulatedQuiz[]
 
     // Calculate statistics
     const stats = {
@@ -81,7 +124,7 @@ export async function GET() {
     let attemptCount = 0
 
     quizzes.forEach(quiz => {
-      quiz.scores?.forEach((score: any) => {
+      quiz.scores?.forEach(score => {
         totalScore += score.score
         totalMaxScore += score.maxScore
         attemptCount++
@@ -109,7 +152,7 @@ export async function GET() {
     })
     .sort({ createdAt: -1 })
     .limit(5)
-    .lean()
+    .lean() as PopulatedScore[]
 
     const recentActivity = recentScores.map(score => ({
       type: 'quiz_attempt',
