@@ -4,7 +4,7 @@ import { connectDB } from '@/lib/mongodb'
 import User from '@/models/User'
 import Class from '@/models/Class'
 import Quiz, { IQuiz } from '@/models/Quiz'
-import Score from '@/models/Score'
+import Score, { IScore } from '@/models/Score'
 import { Types } from 'mongoose'
 
 interface RouteParams {
@@ -31,6 +31,19 @@ interface LeanQuizDocument {
   class: Types.ObjectId;
   questions: QuestionDoc[];
   timeLimit?: number;
+  createdAt: Date;
+  updatedAt: Date;
+  __v: number;
+}
+
+// Define the shape of a score document after .lean()
+interface LeanScoreDocument {
+  _id: Types.ObjectId;
+  user: Types.ObjectId;
+  quiz: Types.ObjectId;
+  score: number;
+  maxScore: number;
+  answers?: string[];
   createdAt: Date;
   updatedAt: Date;
   __v: number;
@@ -92,7 +105,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       const existingScore = await Score.findOne({
         quiz: quiz._id,
         user: user._id
-      }).lean()
+      }).lean() as LeanScoreDocument | null
 
       if (existingScore) {
         // Return quiz with student's previous attempt data
@@ -186,7 +199,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const existingScore = await Score.findOne({
       quiz: quiz._id,
       user: user._id
-    })
+    }).lean() as LeanScoreDocument | null
 
     if (existingScore) {
       return NextResponse.json(
