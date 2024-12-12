@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { PlusIcon, TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 
-interface Question {
+export interface Question {
   id?: string
   question: string
   options: string[]

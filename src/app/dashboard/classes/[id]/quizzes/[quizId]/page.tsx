@@ -5,15 +5,9 @@ import { useSession } from 'next-auth/react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeftIcon, ClockIcon } from '@heroicons/react/24/outline'
-import EditQuizQuestions from '@/components/classes/edit-quiz-questions'
+import EditQuizQuestions, { Question as EditQuestion } from '@/components/classes/edit-quiz-questions'
 
-interface Question {
-  id?: string
-  question: string
-  options: string[]
-  answer: string
-  explanation?: string | null
-}
+type Question = EditQuestion
 
 interface Quiz {
   id: string
