@@ -7,9 +7,23 @@ import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
 import { Types } from 'mongoose'
 
-interface ClassWithId extends Omit<IClass, '_id'> {
+// Define the shape of a populated student document
+interface PopulatedStudent {
   _id: Types.ObjectId;
-  students: Array<{ _id: Types.ObjectId; name?: string; email?: string }>;
+  name?: string;
+  email: string;
+}
+
+// Define the shape of a populated class document
+interface PopulatedClass {
+  _id: Types.ObjectId;
+  name: string;
+  code: string;
+  teacher: Types.ObjectId;
+  students: PopulatedStudent[];
+  createdAt: Date;
+  updatedAt: Date;
+  __v: number;
 }
 
 export async function GET() {
@@ -37,9 +51,12 @@ export async function GET() {
     const totalStudents = await User.countDocuments({ role: 'STUDENT' })
 
     // Get teacher's classes with their quizzes and scores
-    const classes = await Class.find({ teacher: user._id })
-      .populate('students')
-      .lean() as ClassWithId[]
+    const classesQuery = await Class.find({ teacher: user._id })
+      .populate('students', 'name email')
+      .lean()
+
+    // Type assertion after verifying the shape
+    const classes = classesQuery as PopulatedClass[]
 
     // Get all quizzes for these classes
     const classIds = classes.map(c => c._id)
