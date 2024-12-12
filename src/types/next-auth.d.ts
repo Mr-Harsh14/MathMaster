@@ -1,13 +1,8 @@
+import { User as PrismaUser, UserRole } from '@prisma/client'
 import 'next-auth'
-import { UserRole } from '@prisma/client'
 
 declare module 'next-auth' {
-  interface User {
-    id: string
-    email: string
-    name?: string | null
-    role: UserRole
-  }
+  interface User extends PrismaUser {}
 
   interface Session {
     user: {
