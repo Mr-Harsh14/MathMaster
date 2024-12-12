@@ -5,6 +5,54 @@ import User from '@/models/User'
 import Class from '@/models/Class'
 import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
+import { Types } from 'mongoose'
+
+interface MongoDBUser {
+  _id: Types.ObjectId;
+  name?: string;
+  email: string;
+  role: string;
+  __v: number;
+}
+
+interface MongoDBClass {
+  _id: Types.ObjectId;
+  name: string;
+  teacher: Types.ObjectId;
+  students?: Array<{
+    _id: Types.ObjectId;
+    name?: string;
+    email: string;
+  }>;
+  __v: number;
+}
+
+interface MongoDBQuiz {
+  _id: Types.ObjectId;
+  title: string;
+  class: Types.ObjectId;
+  __v: number;
+}
+
+interface MongoDBScore {
+  _id: Types.ObjectId;
+  user: Types.ObjectId;
+  quiz: {
+    _id: Types.ObjectId;
+    title: string;
+    class: Types.ObjectId;
+  };
+  score: number;
+  maxScore: number;
+  createdAt: Date;
+  __v: number;
+}
+
+interface Student {
+  _id: Types.ObjectId;
+  name?: string;
+  email: string;
+}
 
 export async function GET() {
   try {
@@ -18,7 +66,7 @@ export async function GET() {
     }
 
     await connectDB()
-    const user = await User.findOne({ email: session.user.email })
+    const user = await User.findOne({ email: session.user.email }).lean() as MongoDBUser
 
     if (!user || user.role !== 'TEACHER') {
       return NextResponse.json(
@@ -28,7 +76,7 @@ export async function GET() {
     }
 
     // Get all classes where the user is the teacher
-    const teacherClasses = await Class.find({ teacher: user._id }).lean()
+    const teacherClasses = await Class.find({ teacher: user._id }).lean() as MongoDBClass[]
     
     if (!teacherClasses.length) {
       return NextResponse.json([])
@@ -39,14 +87,14 @@ export async function GET() {
     // Get all students who are in any of these classes
     const studentsInClasses = await Class.find({ _id: { $in: classIds } })
       .populate('students', 'name email')
-      .lean()
+      .lean() as MongoDBClass[]
 
     // Create a unique set of student IDs
-    const uniqueStudentIds = new Set()
-    const uniqueStudents = []
+    const uniqueStudentIds = new Set<string>()
+    const uniqueStudents: Student[] = []
     
     studentsInClasses.forEach(cls => {
-      cls.students?.forEach((student: any) => {
+      cls.students?.forEach((student) => {
         if (!uniqueStudentIds.has(student._id.toString())) {
           uniqueStudentIds.add(student._id.toString())
           uniqueStudents.push(student)
@@ -59,7 +107,7 @@ export async function GET() {
     }
 
     // Get all quizzes for these classes
-    const quizzes = await Quiz.find({ class: { $in: classIds } }).lean()
+    const quizzes = await Quiz.find({ class: { $in: classIds } }).lean() as MongoDBQuiz[]
     const quizIds = quizzes.map(q => q._id)
 
     // Get all scores for these quizzes
@@ -68,13 +116,13 @@ export async function GET() {
       user: { $in: Array.from(uniqueStudentIds) }
     })
     .populate('quiz', 'title class')
-    .lean()
+    .lean() as MongoDBScore[]
 
     // Process student data
     const processedStudents = await Promise.all(uniqueStudents.map(async (student) => {
       // Get classes this student is enrolled in
       const enrolledClasses = teacherClasses.filter(cls => 
-        cls.students?.some((s: any) => s.toString() === student._id.toString())
+        cls.students?.some(s => s._id.toString() === student._id.toString())
       )
 
       // Get scores for this student
