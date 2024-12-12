@@ -14,15 +14,26 @@ interface RouteParams {
   }
 }
 
-interface QuizDocument extends Omit<IQuiz, '_id'> {
+// Define the shape of a question in the lean document
+interface QuestionDoc {
   _id: Types.ObjectId;
-  questions: Array<{
-    _id: Types.ObjectId;
-    question: string;
-    options: string[];
-    answer: string;
-    explanation?: string;
-  }>;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation?: string;
+}
+
+// Define the shape of the lean document returned by .lean()
+interface LeanQuizDocument {
+  _id: Types.ObjectId;
+  title: string;
+  description?: string;
+  class: Types.ObjectId;
+  questions: QuestionDoc[];
+  timeLimit?: number;
+  createdAt: Date;
+  updatedAt: Date;
+  __v: number;
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
@@ -67,7 +78,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       _id: params.quizId,
       class: params.id
     })
-    .lean() as QuizDocument | null
+    .lean() as LeanQuizDocument | null
 
     if (!quiz) {
       return NextResponse.json(
@@ -162,7 +173,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const quiz = await Quiz.findOne({
       _id: params.quizId,
       class: params.id
-    }).lean() as QuizDocument | null
+    }).lean() as LeanQuizDocument | null
 
     if (!quiz) {
       return NextResponse.json(
