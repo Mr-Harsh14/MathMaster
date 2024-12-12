@@ -38,6 +38,34 @@ interface PopulatedQuiz {
   createdAt: Date;
 }
 
+interface MongoDBQuiz {
+  _id: Types.ObjectId;
+  title: string;
+  class: {
+    _id: Types.ObjectId;
+    name: string;
+  };
+  questions: Array<{
+    _id: Types.ObjectId;
+    question: string;
+    options: string[];
+    answer: string;
+  }>;
+  scores?: Array<{
+    _id: Types.ObjectId;
+    user: {
+      _id: Types.ObjectId;
+      name?: string;
+      email: string;
+    };
+    score: number;
+    maxScore: number;
+    createdAt: Date;
+  }>;
+  createdAt: Date;
+  __v: number;
+}
+
 export async function GET() {
   try {
     const session = await getServerSession()
@@ -63,7 +91,7 @@ export async function GET() {
     const teacherClasses = await Class.find({ teacher: user._id })
     const classIds = teacherClasses.map(c => c._id)
 
-    const quizzes = await Quiz.find({ class: { $in: classIds } })
+    const rawQuizzes = await Quiz.find({ class: { $in: classIds } })
       .populate('class', 'name')
       .populate({
         path: 'scores',
@@ -72,7 +100,19 @@ export async function GET() {
           select: 'name email'
         }
       })
-      .lean() as PopulatedQuiz[]
+      .lean()
+
+    const quizzes = (rawQuizzes as MongoDBQuiz[]).map(quiz => ({
+      _id: quiz._id,
+      title: quiz.title,
+      class: {
+        _id: quiz.class._id,
+        name: quiz.class.name
+      },
+      questions: quiz.questions,
+      scores: quiz.scores,
+      createdAt: quiz.createdAt
+    })) as PopulatedQuiz[]
 
     // Process quiz data
     const processedQuizzes = quizzes.map(quiz => {
