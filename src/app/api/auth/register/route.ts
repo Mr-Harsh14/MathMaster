@@ -35,50 +35,57 @@ export async function POST(req: Request) {
     }
 
     console.log('Checking for existing user...')
-    // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
+    // First, create the auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role
+        }
+      }
+    })
 
-    if (existingUser) {
-      console.log('User already exists:', email)
-      return NextResponse.json(
-        { message: "User already exists" },
-        { status: 400 }
-      )
+    if (authError) {
+      console.error('Auth error:', authError)
+      if (authError.message.includes('already registered')) {
+        return NextResponse.json(
+          { message: "Email already registered" },
+          { status: 400 }
+        )
+      }
+      throw authError
     }
 
-    console.log('Hashing password...')
-    // Hash password
-    const hashedPassword = await hash(password, 12)
+    if (!authData.user) {
+      throw new Error('No user returned from auth signup')
+    }
 
-    console.log('Creating user in database...')
-    // Create user
-    const { data: user, error } = await supabase
+    console.log('Auth user created:', { id: authData.user.id, email: authData.user.email })
+
+    // Now create the user profile in our users table
+    const { data: user, error: profileError } = await supabase
       .from('users')
       .insert([
         {
+          id: authData.user.id, // Use the auth user id
           name,
           email,
-          password: hashedPassword,
           role,
         }
       ])
       .select()
       .single()
 
-    if (error) {
-      console.error('Error creating user:', error)
-      throw error
+    if (profileError) {
+      console.error('Profile creation error:', profileError)
+      // Try to clean up the auth user if profile creation fails
+      await supabase.auth.admin.deleteUser(authData.user.id)
+      throw profileError
     }
 
-    if (!user) {
-      throw new Error('Failed to create user')
-    }
-
-    console.log('User created successfully:', { id: user.id, email: user.email, role: user.role })
+    console.log('User profile created successfully:', { id: user.id, email: user.email, role: user.role })
 
     return NextResponse.json(
       {
@@ -91,16 +98,22 @@ export async function POST(req: Request) {
       { status: 201 }
     )
   } catch (error: unknown) {
-    console.error("Registration error details:", error)
+    console.error("Registration error details:", {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
 
-    // Check for Supabase errors
+    // Check for specific Supabase errors
     if (error && typeof error === 'object' && 'code' in error) {
-      if (error.code === '23505') { // Unique constraint violation
+      const code = (error as { code: string }).code
+      if (code === '23505') { // Unique constraint violation
         return NextResponse.json(
           { message: "Email already exists" },
           { status: 400 }
         )
       }
+      console.error('Supabase error code:', code)
     }
 
     return NextResponse.json(
