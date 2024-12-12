@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { connectDB } from '@/lib/mongodb'
 import User from '@/models/User'
+import { Types } from 'mongoose'
+
+interface MongoDBUser {
+  _id: Types.ObjectId;
+  email: string;
+  name?: string;
+  role: string;
+  __v: number;
+}
 
 export async function GET() {
   try {
@@ -15,7 +24,7 @@ export async function GET() {
     }
 
     await connectDB()
-    const user = await User.findOne({ email: session.user.email }).lean()
+    const user = await User.findOne({ email: session.user.email }).lean() as MongoDBUser
 
     if (!user) {
       return NextResponse.json(
