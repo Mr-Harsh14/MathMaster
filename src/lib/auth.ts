@@ -1,24 +1,15 @@
-import { AuthOptions } from 'next-auth'
+import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { compare } from 'bcryptjs'
-import { prisma } from './prisma'
-import { PrismaAdapter } from '@auth/prisma-adapter'
+import { connectDB } from './mongodb'
+import User from '@/models/User'
+import bcrypt from 'bcryptjs'
 
-export const authOptions: AuthOptions = {
-  adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: 'jwt'
-  },
-  pages: {
-    signIn: '/auth/login',
-    newUser: '/auth/register',
-    error: '/auth/error',
-  },
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        email: { label: 'Email', type: 'text' },
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
@@ -26,17 +17,14 @@ export const authOptions: AuthOptions = {
           throw new Error('Invalid credentials')
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
-          }
-        })
+        await connectDB()
+        const user = await User.findOne({ email: credentials.email })
 
-        if (!user || !user?.password) {
+        if (!user) {
           throw new Error('Invalid credentials')
         }
 
-        const isPasswordValid = await compare(
+        const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
         )
@@ -46,7 +34,7 @@ export const authOptions: AuthOptions = {
         }
 
         return {
-          id: user.id,
+          id: user._id.toString(),
           email: user.email,
           name: user.name,
           role: user.role,
@@ -72,8 +60,16 @@ export const authOptions: AuthOptions = {
           ...session.user,
           id: token.id,
           role: token.role,
-        },
+        }
       }
-    },
+    }
   },
+  pages: {
+    signIn: '/auth/login',
+    newUser: '/auth/register',
+  },
+  session: {
+    strategy: 'jwt',
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 } 

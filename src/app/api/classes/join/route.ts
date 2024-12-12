@@ -1,6 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
 
 export async function POST(req: Request) {
   try {
@@ -10,10 +12,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
@@ -35,14 +35,8 @@ export async function POST(req: Request) {
       )
     }
 
-    const classToJoin = await prisma.class.findUnique({
-      where: { code },
-      include: {
-        students: {
-          where: { id: user.id },
-        },
-      },
-    })
+    const classToJoin = await Class.findOne({ code })
+      .populate('teacher', 'name email')
 
     if (!classToJoin) {
       return NextResponse.json(
@@ -51,37 +45,34 @@ export async function POST(req: Request) {
       )
     }
 
-    if (classToJoin.students.length > 0) {
+    // Check if student is already enrolled
+    if (classToJoin.students.includes(user._id)) {
       return NextResponse.json(
         { message: 'You are already enrolled in this class' },
         { status: 400 }
       )
     }
 
-    const updatedClass = await prisma.class.update({
-      where: { id: classToJoin.id },
-      data: {
-        students: {
-          connect: { id: user.id },
-        },
-      },
-      include: {
-        teacher: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        _count: {
-          select: {
-            students: true,
-            quizzes: true,
-          },
-        },
-      },
-    })
+    // Add student to class
+    classToJoin.students.push(user._id)
+    await classToJoin.save()
 
-    return NextResponse.json(updatedClass)
+    // Format response
+    const formattedClass = {
+      id: classToJoin._id,
+      name: classToJoin.name,
+      code: classToJoin.code,
+      teacher: {
+        name: classToJoin.teacher.name,
+        email: classToJoin.teacher.email,
+      },
+      _count: {
+        students: classToJoin.students.length,
+        quizzes: classToJoin.quizzes || 0,
+      },
+    }
+
+    return NextResponse.json(formattedClass)
   } catch (error) {
     console.error('Error joining class:', error)
     return NextResponse.json(

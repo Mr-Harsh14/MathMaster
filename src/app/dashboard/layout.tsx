@@ -11,6 +11,8 @@ import {
   ClipboardDocumentListIcon,
   TrophyIcon,
   UserIcon,
+  AcademicCapIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -21,13 +23,13 @@ import { Logo } from '@/components/ui/logo'
 function getNavigation(role: string) {
   const baseNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Classes', href: '/dashboard/classes', icon: UsersIcon },
+    { name: 'Classes', href: '/dashboard/classes', icon: AcademicCapIcon },
   ]
 
   if (role === 'TEACHER') {
     return [
       ...baseNavigation,
-      { name: 'Students', href: '/dashboard/students', icon: UsersIcon },
+      { name: 'Students', href: '/dashboard/students', icon: UserGroupIcon },
       { name: 'Quizzes', href: '/dashboard/quizzes', icon: ClipboardDocumentListIcon },
       { name: 'Analytics', href: '/dashboard/analytics', icon: ChartBarIcon },
     ]

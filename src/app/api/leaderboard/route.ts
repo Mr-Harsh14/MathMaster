@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
+import Quiz from '@/models/Quiz'
+import Score from '@/models/Score'
 
-export async function GET(req: Request) {
+export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -14,97 +17,115 @@ export async function GET(req: Request) {
       )
     }
 
-    // Get the timeframe from query parameters
-    const { searchParams } = new URL(req.url)
-    const timeframe = searchParams.get('timeframe') || 'all'
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
-    // Calculate the start date based on timeframe
-    const startDate = new Date()
-    if (timeframe === 'week') {
-      startDate.setDate(startDate.getDate() - 7)
-    } else if (timeframe === 'month') {
-      startDate.setMonth(startDate.getMonth() - 1)
+    if (!user) {
+      return NextResponse.json(
+        { message: 'User not found' },
+        { status: 404 }
+      )
     }
 
-    // Get all students with their scores
-    const students = await prisma.user.findMany({
-      where: {
-        role: 'STUDENT',
-        quizAttempts: timeframe !== 'all' ? {
-          some: {
-            createdAt: {
-              gte: startDate,
-            },
-          },
-        } : undefined,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        quizAttempts: {
-          where: timeframe !== 'all' ? {
-            createdAt: {
-              gte: startDate,
-            },
-          } : undefined,
-          orderBy: {
-            createdAt: 'desc',
-          },
-          select: {
-            score: true,
-            maxScore: true,
-            createdAt: true,
-            quiz: {
-              select: {
-                title: true,
-              },
-            },
-          },
-        },
-      },
+    const { searchParams } = new URL(request.url)
+    const classId = searchParams.get('classId')
+
+    // Get all quizzes and scores based on user's role and filters
+    let quizzes
+    let scores
+
+    if (user.role === 'TEACHER') {
+      if (classId) {
+        // Get class-specific data for teachers
+        const classData = await Class.findOne({
+          _id: classId,
+          teacher: user._id
+        })
+
+        if (!classData) {
+          return NextResponse.json(
+            { message: 'Class not found or access denied' },
+            { status: 404 }
+          )
+        }
+
+        quizzes = await Quiz.find({ class: classId })
+      } else {
+        // Get all quizzes from teacher's classes
+        const teacherClasses = await Class.find({ teacher: user._id })
+        quizzes = await Quiz.find({ class: { $in: teacherClasses.map(c => c._id) } })
+      }
+    } else {
+      // For students, only show scores from their enrolled classes
+      const studentClasses = await Class.find({ students: user._id })
+      if (classId) {
+        // Verify student is enrolled in the class
+        if (!studentClasses.some(c => c._id.toString() === classId)) {
+          return NextResponse.json(
+            { message: 'Class not found or access denied' },
+            { status: 404 }
+          )
+        }
+        quizzes = await Quiz.find({ class: classId })
+      } else {
+        quizzes = await Quiz.find({ class: { $in: studentClasses.map(c => c._id) } })
+      }
+    }
+
+    // Get scores for the filtered quizzes
+    scores = await Score.find({
+      quiz: { $in: quizzes.map(quiz => quiz._id) }
+    })
+    .populate('user', 'name email')
+    .populate({
+      path: 'quiz',
+      select: 'class',
+      populate: {
+        path: 'class',
+        select: 'name'
+      }
+    })
+    .lean()
+
+    // Calculate student rankings
+    const studentScores = new Map()
+
+    scores.forEach(score => {
+      const userId = score.user._id.toString()
+      if (!studentScores.has(userId)) {
+        studentScores.set(userId, {
+          student: score.user,
+          totalScore: 0,
+          totalMaxScore: 0,
+          quizzesTaken: 0,
+          classesTaken: new Set(),
+        })
+      }
+
+      const studentData = studentScores.get(userId)
+      studentData.totalScore += score.score
+      studentData.totalMaxScore += score.maxScore
+      studentData.quizzesTaken += 1
+      studentData.classesTaken.add(score.quiz.class._id.toString())
     })
 
-    // Calculate statistics for each student
-    const leaderboard = students
-      .map(student => {
-        const scores = student.quizAttempts
-        const totalScore = scores.reduce((sum, s) => sum + s.score, 0)
-        const totalMaxScore = scores.reduce((sum, s) => sum + s.maxScore, 0)
-        const averageScore = totalMaxScore > 0
-          ? Math.round((totalScore / totalMaxScore) * 100)
-          : 0
+    // Convert to array and calculate percentages
+    const rankings = Array.from(studentScores.values())
+      .map(data => ({
+        studentName: data.student.name || data.student.email,
+        averageScore: data.totalMaxScore > 0
+          ? Math.round((data.totalScore / data.totalMaxScore) * 100)
+          : 0,
+        quizzesTaken: data.quizzesTaken,
+        classCount: data.classesTaken.size,
+      }))
+      .sort((a, b) => b.averageScore - a.averageScore)
 
-        return {
-          userId: student.id,
-          studentName: student.name || student.email,
-          totalScore,
-          totalMaxScore,
-          averageScore,
-          quizzesTaken: scores.length,
-          recentScores: scores.map(score => ({
-            quizTitle: score.quiz.title,
-            score: score.score,
-            maxScore: score.maxScore,
-            createdAt: score.createdAt,
-          })),
-        }
-      })
-      // Filter out students with no attempts
-      .filter(student => student.quizzesTaken > 0)
-      // Sort by average score (desc) and total score (desc)
-      .sort((a, b) => {
-        if (a.averageScore !== b.averageScore) {
-          return b.averageScore - a.averageScore
-        }
-        return b.totalScore - a.totalScore
-      })
-
-    return NextResponse.json(leaderboard)
+    return NextResponse.json(rankings)
   } catch (error) {
     console.error('Error fetching leaderboard:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Failed to fetch leaderboard' },
       { status: 500 }
     )
   }

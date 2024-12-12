@@ -1,6 +1,10 @@
 import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
+import Score from '@/models/Score'
+import Quiz from '@/models/Quiz'
 
 export async function GET(
   req: Request,
@@ -13,24 +17,20 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
     // Check if user has access to this class
-    const classAccess = await prisma.class.findFirst({
-      where: {
-        id: params.id,
-        OR: [
-          { teacherId: user.id },
-          { students: { some: { id: user.id } } },
-        ],
-      },
+    const classAccess = await Class.findOne({
+      _id: params.id,
+      $or: [
+        { teacher: user._id },
+        { students: user._id }
+      ]
     })
 
     if (!classAccess) {
@@ -41,37 +41,35 @@ export async function GET(
     }
 
     // Get students with their quiz scores
-    const students = await prisma.user.findMany({
-      where: {
-        classesJoined: { some: { id: params.id } },
-      },
-      select: {
-        id: true,
-        name: true,
-        email: user.role === 'TEACHER',
-        quizAttempts: {
-          where: {
-            quiz: {
-              classId: params.id,
-            },
-          },
-          select: {
-            score: true,
-            maxScore: true,
-          },
-        },
-      },
+    const students = await User.find({
+      _id: { $in: classAccess.students }
     })
+    .select('id name email')
+    .lean()
 
-    // Transform the data to match the expected format
-    const formattedStudents = students.map((student) => ({
-      id: student.id,
-      name: student.name,
-      email: student.email || '',
-      quizScores: student.quizAttempts,
-    }))
+    // Get scores for each student
+    const studentsWithScores = await Promise.all(
+      students.map(async (student) => {
+        const scores = await Score.find({
+          user: student._id,
+          quiz: { $in: await Quiz.find({ class: params.id }).select('_id') }
+        })
+        .select('score maxScore')
+        .lean()
 
-    return NextResponse.json(formattedStudents)
+        return {
+          id: student._id,
+          name: student.name,
+          email: user.role === 'TEACHER' ? student.email : undefined,
+          quizScores: scores.map(score => ({
+            score: score.score,
+            maxScore: score.maxScore,
+          })),
+        }
+      })
+    )
+
+    return NextResponse.json(studentsWithScores)
   } catch (error) {
     console.error('Error fetching students:', error)
     return NextResponse.json(

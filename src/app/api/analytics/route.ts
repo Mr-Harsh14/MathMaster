@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
+import Quiz from '@/models/Quiz'
+import Score from '@/models/Score'
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -14,9 +17,8 @@ export async function GET() {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user || user.role !== 'TEACHER') {
       return NextResponse.json(
@@ -26,39 +28,38 @@ export async function GET() {
     }
 
     // Get total students
-    const totalStudents = await prisma.user.count({
-      where: { role: 'STUDENT' },
-    })
+    const totalStudents = await User.countDocuments({ role: 'STUDENT' })
 
     // Get teacher's classes with their quizzes and scores
-    const classes = await prisma.class.findMany({
-      where: { teacherId: user.id },
-      include: {
-        students: true,
-        quizzes: {
-          include: {
-            scores: true,
-          },
-        },
-      },
-    })
+    const classes = await Class.find({ teacher: user._id })
+      .populate({
+        path: 'students',
+      })
+      .lean()
 
-    // Calculate total quizzes and attempts
-    const totalQuizzes = classes.reduce((sum, c) => sum + c.quizzes.length, 0)
-    const totalAttempts = classes.reduce(
-      (sum, c) => sum + c.quizzes.reduce((s, q) => s + q.scores.length, 0),
-      0
-    )
+    // Get all quizzes for these classes
+    const classIds = classes.map(c => c._id)
+    const quizzes = await Quiz.find({ class: { $in: classIds } })
+      .populate({
+        path: 'scores',
+        populate: {
+          path: 'user',
+          select: 'name email'
+        }
+      })
+      .lean()
 
-    // Calculate average score across all quizzes
+    // Calculate statistics
+    const totalQuizzes = quizzes.length
+    const totalAttempts = quizzes.reduce((sum, quiz) => sum + (quiz.scores?.length || 0), 0)
+
+    // Calculate average score
     let totalScore = 0
     let totalMaxScore = 0
-    classes.forEach(c => {
-      c.quizzes.forEach(q => {
-        q.scores.forEach(s => {
-          totalScore += s.score
-          totalMaxScore += s.maxScore
-        })
+    quizzes.forEach(quiz => {
+      quiz.scores?.forEach((score: any) => {
+        totalScore += score.score
+        totalMaxScore += score.maxScore
       })
     })
     const averageScore = totalMaxScore > 0
@@ -66,13 +67,14 @@ export async function GET() {
       : 0
 
     // Calculate class performance
-    const classPerformance = classes.map(c => {
+    const classPerformance = await Promise.all(classes.map(async (c) => {
+      const classQuizzes = quizzes.filter(q => q.class.toString() === c._id.toString())
       let classScore = 0
       let classMaxScore = 0
-      c.quizzes.forEach(q => {
-        q.scores.forEach(s => {
-          classScore += s.score
-          classMaxScore += s.maxScore
+      classQuizzes.forEach(quiz => {
+        quiz.scores?.forEach((score: any) => {
+          classScore += score.score
+          classMaxScore += score.maxScore
         })
       })
 
@@ -82,37 +84,19 @@ export async function GET() {
           ? Math.round((classScore / classMaxScore) * 100)
           : 0,
         totalStudents: c.students.length,
-        totalQuizzes: c.quizzes.length,
+        totalQuizzes: classQuizzes.length,
       }
-    })
+    }))
 
     // Get recent scores
-    const recentScores = await prisma.score.findMany({
-      where: {
-        quiz: {
-          class: {
-            teacherId: user.id,
-          },
-        },
-      },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        quiz: {
-          select: {
-            title: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10,
+    const recentScores = await Score.find({
+      quiz: { $in: quizzes.map(q => q._id) }
     })
+    .populate('user', 'name email')
+    .populate('quiz', 'title')
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean()
 
     return NextResponse.json({
       totalStudents,

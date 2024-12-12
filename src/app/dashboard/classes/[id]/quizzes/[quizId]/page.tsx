@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeftIcon, ClockIcon } from '@heroicons/react/24/outline'
+import EditQuizQuestions from '@/components/classes/edit-quiz-questions'
 
 interface Question {
   id: string
@@ -22,8 +23,12 @@ interface Quiz {
     questions: number
     scores: number
   }
-  highestScore?: number
+  alreadyTaken?: boolean
+  score?: number
   maxScore?: number
+  selectedAnswers?: string[]
+  correctAnswers?: string[]
+  explanations?: (string | null)[]
 }
 
 export default function QuizPage() {
@@ -44,6 +49,7 @@ export default function QuizPage() {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
   const [correctAnswers, setCorrectAnswers] = useState<string[]>([])
   const [explanations, setExplanations] = useState<(string | null)[]>([])
+  const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
     async function fetchQuiz() {
@@ -54,9 +60,20 @@ export default function QuizPage() {
         }
         const data = await response.json()
         setQuiz(data)
-        setSelectedAnswers(new Array(data.questions.length).fill(''))
-        if (data.timeLimit) {
-          setTimeRemaining(data.timeLimit * 60) // Convert minutes to seconds
+
+        // If quiz was already taken, set the states accordingly
+        if (data.alreadyTaken) {
+          setSubmitted(true)
+          setScore(data.score)
+          setSelectedAnswers(data.selectedAnswers || [])
+          setCorrectAnswers(data.correctAnswers || [])
+          setExplanations(data.explanations || [])
+        } else {
+          // Initialize for new quiz attempt
+          setSelectedAnswers(new Array(data.questions.length).fill(''))
+          if (data.timeLimit) {
+            setTimeRemaining(data.timeLimit * 60) // Convert minutes to seconds
+          }
         }
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Something went wrong')
@@ -108,8 +125,11 @@ export default function QuizPage() {
       const data = await response.json()
       setScore(data.score)
       setSubmitted(true)
-      setCorrectAnswers(data.correctAnswers)
-      setExplanations(data.explanations)
+      setCorrectAnswers(data.correctAnswers || [])
+      setExplanations(data.explanations || [])
+
+      // Refresh the page data
+      router.refresh()
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to submit quiz')
     }
@@ -142,6 +162,69 @@ export default function QuizPage() {
       <div className="text-center">
         <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading quiz</h3>
         <p className="mt-1 text-sm text-gray-500">{error || 'Quiz not found'}</p>
+        <Button
+          variant="outline"
+          onClick={() => router.push(`/dashboard/classes/${classId}`)}
+          className="mt-4"
+        >
+          <ArrowLeftIcon className="h-4 w-4 mr-2" />
+          Back to Class
+        </Button>
+      </div>
+    )
+  }
+
+  if (isTeacher && (isEditing || quiz.questions.length === 0)) {
+    return (
+      <div>
+        <div className="mb-8">
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/dashboard/classes/${classId}`)}
+            className="mb-4"
+          >
+            <ArrowLeftIcon className="h-4 w-4 mr-2" />
+            Back to Class
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">{quiz.title}</h1>
+        </div>
+
+        <EditQuizQuestions
+          classId={classId}
+          quizId={quizId}
+          initialQuestions={quiz.questions}
+          onSave={() => {
+            setIsEditing(false)
+            router.refresh()
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (!quiz.questions || quiz.questions.length === 0) {
+    return (
+      <div>
+        <Button
+          variant="outline"
+          onClick={() => router.push(`/dashboard/classes/${classId}`)}
+          className="mb-4"
+        >
+          <ArrowLeftIcon className="h-4 w-4 mr-2" />
+          Back to Class
+        </Button>
+        <div className="text-center">
+          <h3 className="mt-2 text-sm font-semibold text-gray-900">No questions available</h3>
+          <p className="mt-1 text-sm text-gray-500">This quiz has no questions yet.</p>
+          {isTeacher && (
+            <Button
+              onClick={() => setIsEditing(true)}
+              className="mt-4"
+            >
+              Add Questions
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
@@ -175,6 +258,14 @@ export default function QuizPage() {
                 {formatTime(timeRemaining)}
               </span>
             </div>
+          )}
+          {isTeacher && !submitted && (
+            <Button
+              variant="outline"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit Questions
+            </Button>
           )}
         </div>
       </div>

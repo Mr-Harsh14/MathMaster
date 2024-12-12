@@ -24,20 +24,30 @@ export default function StudentsList({ classId }: { classId: string }) {
   useEffect(() => {
     async function fetchStudents() {
       try {
+        setLoading(true)
         const response = await fetch(`/api/classes/${classId}/students`)
         if (!response.ok) {
-          throw new Error('Failed to fetch students')
+          const errorData = await response.json().catch(() => ({}))
+          console.error('Failed to fetch students:', errorData)
+          throw new Error(errorData.message || 'Failed to fetch students')
         }
         const data = await response.json()
+        if (!Array.isArray(data)) {
+          console.error('Invalid students data:', data)
+          throw new Error('Invalid response format')
+        }
         setStudents(data)
       } catch (error) {
+        console.error('Error in fetchStudents:', error)
         setError(error instanceof Error ? error.message : 'Something went wrong')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchStudents()
+    if (classId) {
+      fetchStudents()
+    }
   }, [classId])
 
   if (loading) {
@@ -53,17 +63,18 @@ export default function StudentsList({ classId }: { classId: string }) {
   if (error) {
     return (
       <div className="text-center">
+        <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
         <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading students</h3>
         <p className="mt-1 text-sm text-gray-500">{error}</p>
       </div>
     )
   }
 
-  if (students.length === 0) {
+  if (!students || students.length === 0) {
     return (
       <div className="text-center">
         <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-semibold text-gray-900">No students</h3>
+        <h3 className="mt-2 text-sm font-semibold text-gray-900">No students found</h3>
         <p className="mt-1 text-sm text-gray-500">
           Share the class code with students to let them join.
         </p>
@@ -75,8 +86,8 @@ export default function StudentsList({ classId }: { classId: string }) {
     <div className="overflow-hidden bg-white shadow sm:rounded-md">
       <ul role="list" className="divide-y divide-gray-200">
         {students.map((student) => {
-          const totalScore = student.quizScores.reduce((sum, score) => sum + score.score, 0)
-          const totalMaxScore = student.quizScores.reduce((sum, score) => sum + score.maxScore, 0)
+          const totalScore = student.quizScores?.reduce((sum, score) => sum + score.score, 0) || 0
+          const totalMaxScore = student.quizScores?.reduce((sum, score) => sum + score.maxScore, 0) || 0
           const averageScore = totalMaxScore > 0 
             ? Math.round((totalScore / totalMaxScore) * 100) 
             : 0
@@ -105,7 +116,7 @@ export default function StudentsList({ classId }: { classId: string }) {
                     <div className="flex items-center space-x-2">
                       <dt className="text-sm font-medium text-gray-500">Quizzes Taken:</dt>
                       <dd className="text-sm font-medium text-gray-900">
-                        {student.quizScores.length}
+                        {student.quizScores?.length || 0}
                       </dd>
                     </div>
                   </div>

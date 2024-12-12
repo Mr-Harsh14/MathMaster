@@ -1,6 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
 import { nanoid } from 'nanoid'
 
 // GET /api/classes - Get all classes for the current user
@@ -15,10 +17,8 @@ export async function GET() {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user) {
       return NextResponse.json(
@@ -31,31 +31,30 @@ export async function GET() {
     const isTeacher = user.role === 'TEACHER'
 
     // Get classes based on user role
-    const classes = await prisma.class.findMany({
-      where: isTeacher
-        ? { teacherId: user.id }
-        : { students: { some: { id: user.id } } },
-      include: {
-        teacher: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        _count: {
-          select: {
-            students: true,
-            quizzes: true,
-          },
-        },
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    })
+    const classes = await Class.find(
+      isTeacher
+        ? { teacher: user._id }
+        : { students: user._id }
+    )
+    .populate('teacher', 'name email')
+    .lean()
 
-    // Return empty array if no classes found
-    return NextResponse.json(classes)
+    // Transform the data to match the expected format
+    const formattedClasses = classes.map(cls => ({
+      id: cls._id,
+      name: cls.name,
+      code: cls.code,
+      teacher: {
+        name: cls.teacher.name,
+        email: cls.teacher.email,
+      },
+      _count: {
+        students: cls.students?.length || 0,
+        quizzes: cls.quizzes || 0,
+      },
+    }))
+
+    return NextResponse.json(formattedClasses)
   } catch (error) {
     console.error('Error fetching classes:', error)
     return NextResponse.json(
@@ -77,10 +76,8 @@ export async function POST(req: Request) {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user) {
       return NextResponse.json(
@@ -108,29 +105,32 @@ export async function POST(req: Request) {
     // Generate a unique class code
     const classCode = nanoid(6).toUpperCase()
 
-    const newClass = await prisma.class.create({
-      data: {
-        name: name.trim(),
-        code: classCode,
-        teacherId: user.id,
-      },
-      include: {
-        teacher: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        _count: {
-          select: {
-            students: true,
-            quizzes: true,
-          },
-        },
-      },
+    const newClass = await Class.create({
+      name: name.trim(),
+      code: classCode,
+      teacher: user._id,
+      students: [],
     })
 
-    return NextResponse.json(newClass, { status: 201 })
+    // Populate teacher information
+    await newClass.populate('teacher', 'name email')
+
+    // Format the response
+    const formattedClass = {
+      id: newClass._id,
+      name: newClass.name,
+      code: newClass.code,
+      teacher: {
+        name: newClass.teacher.name,
+        email: newClass.teacher.email,
+      },
+      _count: {
+        students: 0,
+        quizzes: 0,
+      },
+    }
+
+    return NextResponse.json(formattedClass, { status: 201 })
   } catch (error) {
     console.error('Error creating class:', error)
     return NextResponse.json(

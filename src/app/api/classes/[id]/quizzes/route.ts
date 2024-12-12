@@ -1,8 +1,10 @@
 import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
+import Quiz from '@/models/Quiz'
 
-// GET /api/classes/[id]/quizzes - Get all quizzes for a class
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
@@ -14,24 +16,20 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
     // Check if user has access to this class
-    const classAccess = await prisma.class.findFirst({
-      where: {
-        id: params.id,
-        OR: [
-          { teacherId: user.id },
-          { students: { some: { id: user.id } } },
-        ],
-      },
+    const classAccess = await Class.findOne({
+      _id: params.id,
+      $or: [
+        { teacher: user._id },
+        { students: user._id }
+      ]
     })
 
     if (!classAccess) {
@@ -41,70 +39,45 @@ export async function GET(
       )
     }
 
-    // Get quizzes with different data based on user role
-    if (user.role === 'TEACHER') {
-      const quizzes = await prisma.quiz.findMany({
-        where: { classId: params.id },
-        include: {
-          _count: {
-            select: {
-              questions: true,
-              scores: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
+    // Get quizzes
+    const quizzes = await Quiz.find({ class: params.id })
+      .populate({
+        path: 'scores',
+        populate: {
+          path: 'user',
+          select: 'name email'
+        }
       })
+      .lean()
 
-      return NextResponse.json(quizzes)
-    } else {
-      // For students, include their scores
-      const quizzes = await prisma.quiz.findMany({
-        where: { classId: params.id },
-        include: {
-          _count: {
-            select: {
-              questions: true,
-              scores: true,
-            },
-          },
-          scores: {
-            where: { userId: user.id },
-            select: {
-              score: true,
-              maxScore: true,
-            },
-          },
-          questions: {
-            select: {
-              id: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
+    // Format quizzes
+    const formattedQuizzes = quizzes.map(quiz => ({
+      id: quiz._id,
+      title: quiz.title,
+      timeLimit: quiz.timeLimit,
+      questions: quiz.questions.map(q => ({
+        id: q._id,
+        question: q.question,
+        options: q.options,
+        answer: user.role === 'TEACHER' ? q.answer : undefined,
+        explanation: q.explanation,
+      })),
+      _count: {
+        questions: quiz.questions.length,
+        attempts: quiz.scores?.length || 0,
+      },
+    }))
 
-      // Transform the data to include the student's highest score
-      const formattedQuizzes = quizzes.map((quiz) => ({
-        ...quiz,
-        highestScore: quiz.scores[0]?.score || undefined,
-        maxScore: quiz.questions.length * 1, // Assuming 1 point per question
-        scores: undefined, // Remove the scores array
-        questions: undefined, // Remove the questions array
-      }))
-
-      return NextResponse.json(formattedQuizzes)
-    }
+    return NextResponse.json(formattedQuizzes)
   } catch (error) {
     console.error('Error fetching quizzes:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Failed to fetch quizzes' },
       { status: 500 }
     )
   }
 }
 
-// POST /api/classes/[id]/quizzes - Create a new quiz
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
@@ -116,10 +89,8 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user || user.role !== 'TEACHER') {
       return NextResponse.json(
@@ -128,70 +99,52 @@ export async function POST(
       )
     }
 
-    // Check if user has access to this class
-    const classAccess = await prisma.class.findFirst({
-      where: {
-        id: params.id,
-        teacherId: user.id,
-      },
+    // Check if class exists and user is the teacher
+    const classData = await Class.findOne({
+      _id: params.id,
+      teacher: user._id
     })
 
-    if (!classAccess) {
+    if (!classData) {
       return NextResponse.json(
-        { message: 'Class not found or access denied' },
+        { message: 'Class not found or not authorized' },
         { status: 404 }
       )
     }
 
-    const body = await req.json()
-    const { title, questions, timeLimit } = body
+    const { title, description, timeLimit } = await req.json()
 
     // Validate input
-    if (!title || !questions || !Array.isArray(questions) || questions.length === 0) {
+    if (!title) {
       return NextResponse.json(
-        { message: 'Invalid quiz data' },
+        { message: 'Quiz title is required' },
         { status: 400 }
       )
     }
 
-    // Validate each question
-    for (const q of questions) {
-      if (
-        !q.question ||
-        !q.options ||
-        !Array.isArray(q.options) ||
-        q.options.length === 0 ||
-        !q.answer ||
-        !q.options.includes(q.answer)
-      ) {
-        return NextResponse.json(
-          { message: 'Invalid question format' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Create quiz with questions
-    const quiz = await prisma.quiz.create({
-      data: {
-        title,
-        classId: params.id,
-        timeLimit,
-        questions: {
-          create: questions.map(q => ({
-            question: q.question,
-            options: q.options,
-            answer: q.answer,
-            explanation: q.explanation,
-          })),
-        },
-      },
-      include: {
-        questions: true,
-      },
+    // Create quiz
+    const quiz = await Quiz.create({
+      title,
+      description,
+      class: params.id,
+      questions: [],
+      timeLimit: timeLimit ? parseInt(timeLimit) : null,
     })
 
-    return NextResponse.json(quiz)
+    // Format response
+    const formattedQuiz = {
+      id: quiz._id,
+      title: quiz.title,
+      description: quiz.description,
+      timeLimit: quiz.timeLimit,
+      questions: [],
+      _count: {
+        questions: 0,
+        scores: 0,
+      },
+    }
+
+    return NextResponse.json(formattedQuiz, { status: 201 })
   } catch (error) {
     console.error('Error creating quiz:', error)
     return NextResponse.json(

@@ -1,230 +1,237 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import { useParams } from 'next/navigation'
+import useClass from '@/hooks/use-class'
 import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import StudentsList from '@/components/classes/students-list'
 import QuizList from '@/components/classes/quiz-list'
-import CreateQuizDialog from '@/components/classes/create-quiz-dialog'
-import useClass from '@/hooks/use-class'
+import {
+  UsersIcon,
+  AcademicCapIcon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+} from '@heroicons/react/24/outline'
 
-export default function ClassPage({ params }: { params: { id: string } }) {
-  const router = useRouter()
+type TabType = 'overview' | 'students' | 'quizzes'
+
+export default function ClassPage() {
   const { data: session } = useSession()
+  const params = useParams()
+  const { classData, loading, error, refresh } = useClass(params.id as string)
   const isTeacher = session?.user?.role === 'TEACHER'
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'quizzes'>('overview')
-  const [isCreateQuizOpen, setIsCreateQuizOpen] = useState(false)
-  const { classData, loading, error } = useClass(params.id)
+  const [activeTab, setActiveTab] = useState<TabType>('overview')
 
   if (loading) {
     return (
-      <div className="animate-pulse">
-        <div className="h-32 bg-gray-200 rounded-lg mb-4"></div>
-        <div className="h-64 bg-gray-200 rounded-lg"></div>
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-32 bg-gray-200 rounded"></div>
+          ))}
+        </div>
+        <div className="h-96 bg-gray-200 rounded"></div>
       </div>
     )
   }
 
-  if (error) {
+  if (error || !classData) {
     return (
-      <div className="text-center text-red-500">
-        <p>{error}</p>
-      </div>
-    )
-  }
-
-  if (!classData) {
-    return (
-      <div className="text-center text-gray-500">
-        <p>Class not found</p>
+      <div className="rounded-lg bg-white p-8 text-center">
+        <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-semibold text-gray-900">Error loading class</h3>
+        <p className="mt-1 text-sm text-gray-500">{error || 'Class data not available'}</p>
+        <div className="mt-6">
+          <Button onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{classData.name}</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Teacher: {classData.teacher.name || classData.teacher.email}
-            </p>
-            {isTeacher && (
-              <p className="mt-1 text-sm font-mono text-gray-500">
-                Class Code: {classData.code}
-              </p>
-            )}
+    <div className="space-y-6">
+      {/* Class Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">{classData.name}</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Class Code: <span className="font-mono">{classData.code}</span>
+        </p>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`${
+              activeTab === 'overview'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('students')}
+            className={`${
+              activeTab === 'students'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
+          >
+            Students
+          </button>
+          <button
+            onClick={() => setActiveTab('quizzes')}
+            className={`${
+              activeTab === 'quizzes'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
+          >
+            Quizzes
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'overview' && (
+        <>
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-white">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <UsersIcon className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-sm font-medium text-gray-500">Students</h3>
+                    <p className="mt-1 text-2xl font-semibold text-gray-900">
+                      {classData.stats.totalStudents}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="bg-white">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-indigo-50 rounded-lg">
+                    <AcademicCapIcon className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-sm font-medium text-gray-500">Quizzes</h3>
+                    <p className="mt-1 text-2xl font-semibold text-gray-900">
+                      {classData.stats.totalQuizzes}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="bg-white">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-50 rounded-lg">
+                    <ChartBarIcon className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                    <p className="mt-1 text-2xl font-semibold text-gray-900">
+                      {classData.stats.averageScore}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="bg-white">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-purple-50 rounded-lg">
+                    <ClipboardDocumentListIcon className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-sm font-medium text-gray-500">Recent Activity</h3>
+                    <p className="mt-1 text-2xl font-semibold text-gray-900">
+                      {classData.recentActivity.attempts.length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
-          {isTeacher && (
-            <Button onClick={() => setIsCreateQuizOpen(true)}>
-              Create Quiz
-            </Button>
+
+          {/* Recent Activity */}
+          {classData.recentActivity.attempts.length > 0 && (
+            <Card className="bg-white">
+              <div className="p-6">
+                <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
+                <div className="mt-6 flow-root">
+                  <ul role="list" className="-mb-8">
+                    {classData.recentActivity.attempts.map((activity, activityIdx) => (
+                      <li key={activityIdx}>
+                        <div className="relative pb-8">
+                          {activityIdx !== classData.recentActivity.attempts.length - 1 ? (
+                            <span
+                              className="absolute left-5 top-5 -ml-px h-full w-0.5 bg-gray-200"
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                          <div className="relative flex items-start space-x-3">
+                            <div className="relative">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50">
+                                <AcademicCapIcon className="h-6 w-6 text-indigo-600" aria-hidden="true" />
+                              </div>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div>
+                                <div className="text-sm text-gray-500">
+                                  <span className="font-medium text-gray-900">{activity.studentName}</span>
+                                  {' completed '}
+                                  <span className="font-medium text-gray-900">{activity.quizTitle}</span>
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500">
+                                  Score: {activity.score}/{activity.maxScore} (
+                                  {Math.round((activity.score / activity.maxScore) * 100)}%)
+                                </p>
+                                <p className="mt-0.5 text-sm text-gray-500">
+                                  {new Date(activity.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </Card>
           )}
+        </>
+      )}
+
+      {activeTab === 'students' && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">Students</h3>
+          <StudentsList classId={params.id as string} />
         </div>
+      )}
 
-        {/* Stats Overview */}
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="bg-white shadow-sm">
-            <div className="p-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Students</h3>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">
-                {classData._count.students}
-              </p>
-            </div>
-          </Card>
-          <Card className="bg-white shadow-sm">
-            <div className="p-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Quizzes</h3>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">
-                {classData._count.quizzes}
-              </p>
-            </div>
-          </Card>
-          <Card className="bg-white shadow-sm">
-            <div className="p-4">
-              <h3 className="text-sm font-medium text-gray-500">Recent Activity</h3>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">
-                {classData.recentActivity.attempts.length}
-              </p>
-            </div>
-          </Card>
+      {activeTab === 'quizzes' && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">Quizzes</h3>
+          <QuizList classId={params.id as string} isTeacher={isTeacher} onQuizDeleted={refresh} />
         </div>
-
-        {/* Navigation */}
-        <div className="mt-8 border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`${
-                activeTab === 'overview'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-700 hover:border-gray-300 hover:text-gray-800'
-              } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('students')}
-              className={`${
-                activeTab === 'students'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-700 hover:border-gray-300 hover:text-gray-800'
-              } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
-            >
-              Students
-            </button>
-            <button
-              onClick={() => setActiveTab('quizzes')}
-              className={`${
-                activeTab === 'quizzes'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-700 hover:border-gray-300 hover:text-gray-800'
-              } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
-            >
-              Quizzes
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="mt-6">
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
-              {classData.recentActivity.attempts.length > 0 ? (
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  <ul role="list" className="divide-y divide-gray-200">
-                    {classData.recentActivity.attempts.map((attempt) => (
-                      <li key={attempt.id} className="px-4 py-4 sm:px-6">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-gray-900">
-                            <span className="font-medium">{attempt.studentName}</span>
-                            {' completed '}
-                            <span className="font-medium">{attempt.quizTitle}</span>
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            Score: {attempt.score}/{attempt.maxScore} (
-                            {Math.round((attempt.score / attempt.maxScore) * 100)}%)
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">No recent activity</p>
-              )}
-            </div>
-
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Students</h2>
-              {classData.recentActivity.students.length > 0 ? (
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  <ul role="list" className="divide-y divide-gray-200">
-                    {classData.recentActivity.students.map((student) => (
-                      <li key={student.id} className="px-4 py-4 sm:px-6">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium text-gray-900">
-                            {student.name || 'Unnamed Student'}
-                          </div>
-                          {isTeacher && student.email && (
-                            <div className="text-sm text-gray-500">{student.email}</div>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">No students yet</p>
-              )}
-            </div>
-
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Quizzes</h2>
-              {classData.recentActivity.quizzes.length > 0 ? (
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  <ul role="list" className="divide-y divide-gray-200">
-                    {classData.recentActivity.quizzes.map((quiz) => (
-                      <li key={quiz.id} className="px-4 py-4 sm:px-6">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium text-gray-900">
-                            {quiz.title}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {quiz._count.questions} questions • {quiz._count.scores} attempts
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">No quizzes yet</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'students' && (
-          <StudentsList classId={params.id} />
-        )}
-
-        {activeTab === 'quizzes' && (
-          <QuizList classId={params.id} />
-        )}
-      </div>
-
-      <CreateQuizDialog
-        open={isCreateQuizOpen}
-        onClose={() => setIsCreateQuizOpen(false)}
-        classId={params.id}
-      />
+      )}
     </div>
   )
 } 

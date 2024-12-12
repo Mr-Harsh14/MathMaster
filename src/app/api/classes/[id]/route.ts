@@ -1,6 +1,10 @@
-import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
+import Quiz from '@/models/Quiz'
+import Score from '@/models/Score'
 
 export async function GET(
   req: Request,
@@ -10,134 +14,130 @@ export async function GET(
     const session = await getServerSession()
 
     if (!session?.user?.email) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { message: 'Not authenticated' },
+        { status: 401 }
+      )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 })
+      return NextResponse.json(
+        { message: 'User not found' },
+        { status: 404 }
+      )
     }
 
-    // Check if user has access to this class and get class data
-    const classAccess = await prisma.class.findFirst({
-      where: {
-        id: params.id,
-        OR: [
-          { teacherId: user.id },
-          { students: { some: { id: user.id } } },
-        ],
-      },
-      include: {
-        teacher: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        students: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 5,
-        },
-        quizzes: {
-          select: {
-            id: true,
-            title: true,
-            createdAt: true,
-            _count: {
-              select: {
-                questions: true,
-                scores: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 5,
-        },
-        _count: {
-          select: {
-            students: true,
-            quizzes: true,
-          },
-        },
-      },
+    // Check if user has access to this class
+    const classData = await Class.findOne({
+      _id: params.id,
+      $or: [
+        { teacher: user._id },
+        { students: user._id }
+      ]
     })
+    .populate('teacher', 'name email')
+    .populate('students', 'name email')
+    .lean()
 
-    if (!classAccess) {
+    if (!classData) {
       return NextResponse.json(
         { message: 'Class not found or access denied' },
         { status: 404 }
       )
     }
 
-    // Get recent quiz attempts
-    const recentAttempts = await prisma.score.findMany({
-      where: {
-        quiz: {
-          classId: params.id,
-        },
-      },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        quiz: {
-          select: {
-            title: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 5,
+    // Get quizzes for this class
+    const quizzes = await Quiz.find({ class: params.id })
+      .populate({
+        path: 'scores',
+        populate: {
+          path: 'user',
+          select: 'name email'
+        }
+      })
+      .lean()
+
+    // Get recent activity (quiz attempts)
+    const recentScores = await Score.find({
+      quiz: { $in: quizzes.map(q => q._id) }
+    })
+    .populate('user', 'name email')
+    .populate({
+      path: 'quiz',
+      select: 'title'
+    })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .lean()
+
+    // Calculate class statistics
+    let totalScore = 0
+    let totalMaxScore = 0
+    let totalAttempts = 0
+
+    quizzes.forEach(quiz => {
+      quiz.scores?.forEach((score: any) => {
+        totalScore += score.score
+        totalMaxScore += score.maxScore
+        totalAttempts++
+      })
     })
 
     // Format the response
-    const response = {
-      ...classAccess,
+    const formattedClass = {
+      id: classData._id,
+      name: classData.name,
+      code: classData.code,
+      teacher: {
+        name: classData.teacher.name,
+        email: classData.teacher.email,
+      },
+      students: classData.students.map((student: any) => ({
+        id: student._id,
+        name: student.name,
+        email: student.email,
+      })),
+      stats: {
+        totalStudents: classData.students.length,
+        totalQuizzes: quizzes.length,
+        averageScore: totalMaxScore > 0
+          ? Math.round((totalScore / totalMaxScore) * 100)
+          : 0,
+      },
       recentActivity: {
-        students: classAccess.students.map(student => ({
-          id: student.id,
-          name: student.name,
-          email: user.role === 'TEACHER' ? student.email : undefined,
-        })),
-        quizzes: classAccess.quizzes,
-        attempts: recentAttempts.map(attempt => ({
-          id: attempt.id,
-          studentName: attempt.user.name,
-          studentEmail: user.role === 'TEACHER' ? attempt.user.email : undefined,
-          quizTitle: attempt.quiz.title,
-          score: attempt.score,
-          maxScore: attempt.maxScore,
-          createdAt: attempt.createdAt,
+        attempts: recentScores.map(score => ({
+          studentName: score.user.name || score.user.email,
+          quizTitle: score.quiz.title,
+          score: score.score,
+          maxScore: score.maxScore,
+          createdAt: score.createdAt,
         })),
       },
-      // Remove the raw data from the response
-      students: undefined,
-      quizzes: undefined,
+      quizzes: quizzes.map(quiz => ({
+        id: quiz._id,
+        title: quiz.title,
+        questions: quiz.questions.map(q => ({
+          ...q,
+          answer: user.role === 'TEACHER' ? q.answer : undefined,
+          explanation: q.explanation,
+        })),
+        scores: quiz.scores?.map((score: any) => ({
+          studentName: score.user.name || score.user.email,
+          score: score.score,
+          maxScore: score.maxScore,
+          createdAt: score.createdAt,
+        })),
+      })),
     }
 
-    return NextResponse.json(response)
+    return NextResponse.json(formattedClass)
   } catch (error) {
     console.error('Error fetching class:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Failed to fetch class details' },
       { status: 500 }
     )
   }
@@ -149,56 +149,48 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession()
+
     if (!session?.user?.email) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { message: 'Not authenticated' },
+        { status: 401 }
+      )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user || user.role !== 'TEACHER') {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { message: 'Not authorized' },
+        { status: 403 }
+      )
     }
 
-    const classId = params.id
-
-    // Verify the user is the teacher of this class
-    const classData = await prisma.class.findUnique({
-      where: { id: classId },
-      select: { teacherId: true }
+    // Check if class exists and belongs to the teacher
+    const classToDelete = await Class.findOne({
+      _id: params.id,
+      teacher: user._id
     })
 
-    if (!classData || classData.teacherId !== user.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    if (!classToDelete) {
+      return NextResponse.json(
+        { message: 'Class not found or not authorized to delete' },
+        { status: 404 }
+      )
     }
 
-    // Delete all related data first
-    await prisma.$transaction([
-      prisma.score.deleteMany({
-        where: { quiz: { classId } }
-      }),
-      prisma.question.deleteMany({
-        where: { quiz: { classId } }
-      }),
-      prisma.quiz.deleteMany({
-        where: { classId }
-      }),
-      prisma.class.update({
-        where: { id: classId },
-        data: {
-          students: {
-            set: [] // Remove all student associations
-          }
-        }
-      }),
-      prisma.class.delete({
-        where: { id: classId }
-      })
-    ])
+    // Delete all related quizzes and scores
+    const quizzes = await Quiz.find({ class: params.id })
+    for (const quiz of quizzes) {
+      await Score.deleteMany({ quiz: quiz._id })
+    }
+    await Quiz.deleteMany({ class: params.id })
 
-    return NextResponse.json({ success: true })
+    // Delete the class
+    await Class.deleteOne({ _id: params.id })
+
+    return NextResponse.json({ message: 'Class deleted successfully' })
   } catch (error) {
     console.error('Error deleting class:', error)
     return NextResponse.json(

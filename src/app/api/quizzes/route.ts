@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { connectDB } from '@/lib/mongodb'
+import User from '@/models/User'
+import Class from '@/models/Class'
+import Quiz from '@/models/Quiz'
+import Score from '@/models/Score'
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -14,9 +17,8 @@ export async function GET() {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
+    await connectDB()
+    const user = await User.findOne({ email: session.user.email })
 
     if (!user || user.role !== 'TEACHER') {
       return NextResponse.json(
@@ -25,84 +27,62 @@ export async function GET() {
       )
     }
 
-    // Get all quizzes from teacher's classes
-    const quizzes = await prisma.quiz.findMany({
-      where: {
-        class: {
-          teacherId: user.id,
-        },
-      },
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        classId: true,
-        class: {
-          select: {
-            name: true,
-          },
-        },
-        questions: {
-          select: {
-            id: true,
-          },
-        },
-        scores: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-          select: {
-            score: true,
-            maxScore: true,
-            createdAt: true,
-            user: {
-              select: {
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    // Get all quizzes from classes where user is the teacher
+    const teacherClasses = await Class.find({ teacher: user._id })
+    const classIds = teacherClasses.map(c => c._id)
 
-    // Process and format quiz data
-    const formattedQuizzes = quizzes.map(quiz => {
-      // Calculate quiz statistics
-      const totalScore = quiz.scores.reduce((sum, s) => sum + s.score, 0)
-      const totalMaxScore = quiz.scores.reduce((sum, s) => sum + s.maxScore, 0)
+    const quizzes = await Quiz.find({ class: { $in: classIds } })
+      .populate('class', 'name')
+      .populate({
+        path: 'scores',
+        populate: {
+          path: 'user',
+          select: 'name email'
+        }
+      })
+      .lean()
+
+    // Process quiz data
+    const processedQuizzes = quizzes.map(quiz => {
+      const attempts = quiz.scores || []
+      const totalScore = attempts.reduce((sum, score) => sum + score.score, 0)
+      const totalMaxScore = attempts.reduce((sum, score) => sum + score.maxScore, 0)
       const averageScore = totalMaxScore > 0
         ? Math.round((totalScore / totalMaxScore) * 100)
         : 0
 
+      // Get most recent attempt
+      const recentAttempt = attempts.length > 0
+        ? attempts.reduce((latest, current) => 
+            new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+          )
+        : null
+
       return {
-        id: quiz.id,
+        id: quiz._id,
         title: quiz.title,
         className: quiz.class.name,
-        classId: quiz.classId,
+        classId: quiz.class._id,
         createdAt: quiz.createdAt,
         stats: {
           totalQuestions: quiz.questions.length,
-          totalAttempts: quiz.scores.length,
+          totalAttempts: attempts.length,
           averageScore,
-          recentAttempt: quiz.scores[0] ? {
-            studentName: quiz.scores[0].user.name || quiz.scores[0].user.email,
-            score: quiz.scores[0].score,
-            maxScore: quiz.scores[0].maxScore,
-            createdAt: quiz.scores[0].createdAt,
-          } : null,
-        },
+          recentAttempt: recentAttempt ? {
+            studentName: recentAttempt.user.name || recentAttempt.user.email,
+            score: recentAttempt.score,
+            maxScore: recentAttempt.maxScore,
+            createdAt: recentAttempt.createdAt
+          } : null
+        }
       }
     })
 
-    return NextResponse.json(formattedQuizzes)
+    return NextResponse.json(processedQuizzes)
   } catch (error) {
     console.error('Error fetching quizzes:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Failed to fetch quizzes' },
       { status: 500 }
     )
   }

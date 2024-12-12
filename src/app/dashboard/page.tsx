@@ -17,41 +17,20 @@ import { Button } from '@/components/ui/button'
 
 interface DashboardData {
   stats: {
-    totalStudents?: number
+    totalStudents: number
     totalClasses: number
     totalQuizzes: number
     averageScore: number
-    quizzesCompleted?: number
-    rank?: number
-    totalStudentsInRank?: number
+    recentActivity: {
+      type: string
+      studentName: string
+      quizTitle: string
+      className: string
+      score: number
+      maxScore: number
+      createdAt: string
+    }[]
   }
-  recentActivity: {
-    type: 'quiz' | 'attempt' | 'student' | 'class'
-    title: string
-    subtitle: string
-    score?: number
-    maxScore?: number
-    date: string
-  }[]
-  upcomingQuizzes?: {
-    id: string
-    title: string
-    className: string
-    dueDate?: string
-    totalQuestions: number
-  }[]
-  topPerformers?: {
-    studentName: string
-    score: number
-    className: string
-  }[]
-  performanceByClass?: {
-    className: string
-    averageScore: number
-    quizzesTaken: number
-    rank: number
-    totalStudents: number
-  }[]
 }
 
 function classNames(...classes: string[]) {
@@ -252,33 +231,6 @@ export default function DashboardPage() {
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <TrophyIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Your Rank</dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {dashboardData.stats.rank} / {dashboardData.stats.totalStudentsInRank}
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-5 py-3">
-                <Link
-                  href="/dashboard/leaderboard"
-                  className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
-                >
-                  View leaderboard
-                  <ArrowRightIcon className="ml-1 h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
                     <FolderIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
                   </div>
                   <div className="ml-5 w-0 flex-1">
@@ -308,18 +260,18 @@ export default function DashboardPage() {
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Quizzes Completed</dt>
-                      <dd className="text-lg font-medium text-gray-900">{dashboardData.stats.quizzesCompleted}</dd>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Quizzes Taken</dt>
+                      <dd className="text-lg font-medium text-gray-900">{dashboardData.stats.totalQuizzes}</dd>
                     </dl>
                   </div>
                 </div>
               </div>
               <div className="bg-gray-50 px-5 py-3">
                 <Link
-                  href="/dashboard/classes"
+                  href="/dashboard/quizzes"
                   className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
                 >
-                  Take a quiz
+                  View quizzes
                   <ArrowRightIcon className="ml-1 h-4 w-4" />
                 </Link>
               </div>
@@ -341,10 +293,10 @@ export default function DashboardPage() {
               </div>
               <div className="bg-gray-50 px-5 py-3">
                 <Link
-                  href="/dashboard/classes"
+                  href="/dashboard/analytics"
                   className="text-sm font-medium text-indigo-700 hover:text-indigo-900 flex items-center"
                 >
-                  View performance
+                  View progress
                   <ArrowRightIcon className="ml-1 h-4 w-4" />
                 </Link>
               </div>
@@ -353,169 +305,52 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Activity */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">Recent Activity</h3>
-            <div className="mt-6 flow-root">
-              <ul role="list" className="-mb-8">
-                {dashboardData.recentActivity.map((activity, activityIdx) => (
-                  <li key={activityIdx}>
-                    <div className="relative pb-8">
-                      {activityIdx !== dashboardData.recentActivity.length - 1 ? (
-                        <span
-                          className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                      <div className="relative flex space-x-3">
-                        <div>
-                          <span
-                            className={classNames(
-                              'h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white',
-                              activity.type === 'quiz'
-                                ? 'bg-blue-500'
-                                : activity.type === 'attempt'
-                                ? 'bg-green-500'
-                                : activity.type === 'student'
-                                ? 'bg-purple-500'
-                                : 'bg-gray-500'
-                            )}
-                          >
-                            {activity.type === 'quiz' ? (
-                              <AcademicCapIcon className="h-5 w-5 text-white" />
-                            ) : activity.type === 'attempt' ? (
-                              <ChartBarIcon className="h-5 w-5 text-white" />
-                            ) : activity.type === 'student' ? (
-                              <UsersIcon className="h-5 w-5 text-white" />
-                            ) : (
-                              <FolderIcon className="h-5 w-5 text-white" />
-                            )}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div>
-                            <p className="text-sm text-gray-500">
-                              {activity.title}
-                              {activity.score !== undefined && (
-                                <span className="ml-2 font-medium text-gray-900">
-                                  ({activity.score}/{activity.maxScore})
-                                </span>
-                              )}
-                            </p>
-                            <p className="mt-0.5 text-sm text-gray-500">{activity.subtitle}</p>
-                          </div>
-                          <div className="mt-2 text-sm text-gray-500">
-                            <time dateTime={activity.date}>
-                              {new Date(activity.date).toLocaleDateString()}
-                            </time>
-                          </div>
+      {/* Recent Activity */}
+      <div className="bg-white shadow sm:rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-base font-semibold leading-6 text-gray-900">Recent Activity</h3>
+          <div className="mt-6 flow-root">
+            <ul role="list" className="-mb-8">
+              {dashboardData.stats.recentActivity.map((activity, activityIdx) => (
+                <li key={activityIdx}>
+                  <div className="relative pb-8">
+                    {activityIdx !== dashboardData.stats.recentActivity.length - 1 ? (
+                      <span
+                        className="absolute left-5 top-5 -ml-px h-full w-0.5 bg-gray-200"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    <div className="relative flex items-start space-x-3">
+                      <div className="relative">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50">
+                          <AcademicCapIcon className="h-6 w-6 text-indigo-600" aria-hidden="true" />
                         </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Teacher: Top Performers or Student: Performance by Class */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">
-              {isTeacher ? 'Top Performers' : 'Your Performance by Class'}
-            </h3>
-            <div className="mt-6 flow-root">
-              <ul role="list" className="divide-y divide-gray-200">
-                {isTeacher
-                  ? dashboardData.topPerformers?.map((performer, index) => (
-                      <li key={index} className="py-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex-shrink-0">
-                            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                              {index + 1}
-                            </div>
+                      <div className="min-w-0 flex-1">
+                        <div>
+                          <div className="text-sm text-gray-500">
+                            <span className="font-medium text-gray-900">{activity.studentName}</span>
+                            {' completed '}
+                            <span className="font-medium text-gray-900">{activity.quizTitle}</span>
+                            {' in '}
+                            <span className="font-medium text-gray-900">{activity.className}</span>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {performer.studentName}
-                            </p>
-                            <p className="text-sm text-gray-500 truncate">{performer.className}</p>
-                          </div>
-                          <div>
-                            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                              {performer.score}%
-                            </span>
-                          </div>
+                          <p className="mt-1 text-sm text-gray-500">
+                            Score: {activity.score}/{activity.maxScore} (
+                            {Math.round((activity.score / activity.maxScore) * 100)}%)
+                          </p>
+                          <p className="mt-0.5 text-sm text-gray-500">
+                            {new Date(activity.createdAt).toLocaleDateString()}
+                          </p>
                         </div>
-                      </li>
-                    ))
-                  : dashboardData.performanceByClass?.map((classPerf, index) => (
-                      <li key={index} className="py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="text-sm font-medium text-gray-900">{classPerf.className}</h4>
-                            <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
-                              <span className="flex items-center">
-                                <ChartBarIcon className="mr-1.5 h-4 w-4 flex-shrink-0 text-gray-400" />
-                                {classPerf.averageScore}% Average
-                              </span>
-                              <span className="flex items-center">
-                                <AcademicCapIcon className="mr-1.5 h-4 w-4 flex-shrink-0 text-gray-400" />
-                                {classPerf.quizzesTaken} Quizzes
-                              </span>
-                              <span className="flex items-center">
-                                <TrophyIcon className="mr-1.5 h-4 w-4 flex-shrink-0 text-gray-400" />
-                                Rank {classPerf.rank}/{classPerf.totalStudents}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Upcoming Quizzes (for students) */}
-        {!isTeacher && dashboardData.upcomingQuizzes && (
-          <div className="lg:col-span-2 bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Upcoming Quizzes</h3>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {dashboardData.upcomingQuizzes.map((quiz) => (
-                  <div
-                    key={quiz.id}
-                    className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          href={`/dashboard/classes/${quiz.id}`}
-                          className="focus:outline-none"
-                        >
-                          <p className="text-sm font-medium text-gray-900 truncate">{quiz.title}</p>
-                          <p className="text-sm text-gray-500 truncate">{quiz.className}</p>
-                          <div className="mt-2 flex items-center text-sm text-gray-500">
-                            <ClockIcon className="mr-1.5 h-4 w-4 flex-shrink-0 text-gray-400" />
-                            {quiz.dueDate ? new Date(quiz.dueDate).toLocaleDateString() : 'No due date'}
-                          </div>
-                          <div className="mt-1 flex items-center text-sm text-gray-500">
-                            <AcademicCapIcon className="mr-1.5 h-4 w-4 flex-shrink-0 text-gray-400" />
-                            {quiz.totalQuestions} Questions
-                          </div>
-                        </Link>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </li>
+              ))}
+            </ul>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
