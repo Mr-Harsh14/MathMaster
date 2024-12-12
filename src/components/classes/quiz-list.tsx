@@ -28,9 +28,14 @@ interface Quiz {
   }
 }
 
-export default function QuizList({ classId }: { classId: string }) {
+interface QuizListProps {
+  classId: string;
+  isTeacher?: boolean | null;
+  onQuizDeleted?: () => void;
+}
+
+export default function QuizList({ classId, isTeacher = false, onQuizDeleted }: QuizListProps) {
   const { data: session } = useSession()
-  const isTeacher = session?.user?.role === 'TEACHER'
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -83,6 +88,7 @@ export default function QuizList({ classId }: { classId: string }) {
       }
 
       setQuizzes(prevQuizzes => prevQuizzes.filter(q => q.id !== quizId));
+      onQuizDeleted?.();
     } catch (error) {
       console.error("Error deleting quiz:", error);
       alert(error instanceof Error ? error.message : "Failed to delete quiz. Please try again.");
