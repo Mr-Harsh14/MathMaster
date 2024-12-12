@@ -8,9 +8,10 @@ import { ArrowLeftIcon, ClockIcon } from '@heroicons/react/24/outline'
 import EditQuizQuestions from '@/components/classes/edit-quiz-questions'
 
 interface Question {
-  id: string
+  id?: string
   question: string
   options: string[]
+  answer: string
   explanation?: string | null
 }
 
