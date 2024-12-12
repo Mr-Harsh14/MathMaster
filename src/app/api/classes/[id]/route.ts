@@ -2,9 +2,61 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { connectDB } from '@/lib/mongodb'
 import User from '@/models/User'
-import Class from '@/models/Class'
+import Class, { IClass } from '@/models/Class'
 import Quiz from '@/models/Quiz'
 import Score from '@/models/Score'
+import { Types } from 'mongoose'
+
+interface PopulatedUser {
+  _id: Types.ObjectId;
+  name?: string;
+  email: string;
+}
+
+interface QuestionDoc {
+  _id: Types.ObjectId;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation?: string;
+}
+
+interface LeanQuizDocument {
+  _id: Types.ObjectId;
+  title: string;
+  class: Types.ObjectId;
+  questions: QuestionDoc[];
+  scores?: Array<{
+    _id: Types.ObjectId;
+    user: PopulatedUser;
+    score: number;
+    maxScore: number;
+    createdAt: Date;
+  }>;
+}
+
+interface LeanScoreDocument {
+  _id: Types.ObjectId;
+  user: PopulatedUser;
+  quiz: {
+    _id: Types.ObjectId;
+    title: string;
+  };
+  score: number;
+  maxScore: number;
+  createdAt: Date;
+}
+
+interface LeanClassDocument {
+  _id: Types.ObjectId;
+  name: string;
+  code: string;
+  teacher: PopulatedUser;
+  students: PopulatedUser[];
+  createdAt: Date;
+  updatedAt: Date;
+  __v: number;
+}
 
 export async function GET(
   req: Request,
@@ -40,7 +92,7 @@ export async function GET(
     })
     .populate('teacher', 'name email')
     .populate('students', 'name email')
-    .lean()
+    .lean() as LeanClassDocument
 
     if (!classData) {
       return NextResponse.json(
@@ -58,7 +110,7 @@ export async function GET(
           select: 'name email'
         }
       })
-      .lean()
+      .lean() as LeanQuizDocument[]
 
     // Get recent activity (quiz attempts)
     const recentScores = await Score.find({
@@ -71,7 +123,7 @@ export async function GET(
     })
     .sort({ createdAt: -1 })
     .limit(5)
-    .lean()
+    .lean() as LeanScoreDocument[]
 
     // Calculate class statistics
     let totalScore = 0
@@ -79,7 +131,7 @@ export async function GET(
     let totalAttempts = 0
 
     quizzes.forEach(quiz => {
-      quiz.scores?.forEach((score: any) => {
+      quiz.scores?.forEach(score => {
         totalScore += score.score
         totalMaxScore += score.maxScore
         totalAttempts++
@@ -95,7 +147,7 @@ export async function GET(
         name: classData.teacher.name,
         email: classData.teacher.email,
       },
-      students: classData.students.map((student: any) => ({
+      students: classData.students.map(student => ({
         id: student._id,
         name: student.name,
         email: student.email,
@@ -124,7 +176,7 @@ export async function GET(
           answer: user.role === 'TEACHER' ? q.answer : undefined,
           explanation: q.explanation,
         })),
-        scores: quiz.scores?.map((score: any) => ({
+        scores: quiz.scores?.map(score => ({
           studentName: score.user.name || score.user.email,
           score: score.score,
           maxScore: score.maxScore,
