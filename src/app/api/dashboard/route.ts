@@ -136,7 +136,7 @@ export async function GET() {
       : 0
 
     // Get recent activity
-    const recentScores = await Score.find(
+    const recentScoresQuery = await Score.find(
       isTeacher
         ? { quiz: { $in: quizzes.map(q => q._id) } }
         : { user: user._id, quiz: { $in: quizzes.map(q => q._id) } }
@@ -152,7 +152,27 @@ export async function GET() {
     })
     .sort({ createdAt: -1 })
     .limit(5)
-    .lean() as PopulatedScore[]
+    .lean()
+
+    // Type assertion after verifying the shape
+    const recentScores = recentScoresQuery.map(score => ({
+      _id: score._id as Types.ObjectId,
+      user: {
+        _id: score.user._id as Types.ObjectId,
+        name: score.user.name,
+        email: score.user.email,
+      },
+      quiz: {
+        _id: score.quiz._id as Types.ObjectId,
+        title: score.quiz.title,
+        class: {
+          name: score.quiz.class.name,
+        },
+      },
+      score: score.score,
+      maxScore: score.maxScore,
+      createdAt: score.createdAt,
+    })) as PopulatedScore[]
 
     const recentActivity = recentScores.map(score => ({
       type: 'quiz_attempt',
