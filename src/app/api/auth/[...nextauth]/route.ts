@@ -1,9 +1,13 @@
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { compare } from "bcryptjs"
-import NextAuth from "next-auth"
+import NextAuth, { type DefaultUser } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import { UserRole } from "@prisma/client"
+
+interface User extends DefaultUser {
+  role: UserRole
+}
 
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -21,7 +25,7 @@ const handler = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials): Promise<User | null> {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Invalid credentials");
         }
@@ -58,13 +62,13 @@ const handler = NextAuth({
     async session({ session, token }) {
       if (session?.user) {
         session.user.id = token.sub as string;
-        session.user.role = token.role as UserRole || 'STUDENT';
+        session.user.role = token.role;
       }
       return session;
     },
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role || 'STUDENT';
+        token.role = (user as User).role;
       }
       return token;
     }
