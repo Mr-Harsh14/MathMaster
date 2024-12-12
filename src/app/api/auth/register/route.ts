@@ -1,7 +1,6 @@
 import { hash } from "bcryptjs"
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import { UserRole, Prisma } from "@prisma/client"
+import { supabase } from "@/lib/supabase"
 
 export async function POST(req: Request) {
   try {
@@ -27,8 +26,8 @@ export async function POST(req: Request) {
     }
 
     // Validate role
-    if (!Object.values(UserRole).includes(role)) {
-      console.log('Invalid role:', role, 'Valid roles:', Object.values(UserRole))
+    if (!['STUDENT', 'TEACHER'].includes(role)) {
+      console.log('Invalid role:', role, 'Valid roles:', ['STUDENT', 'TEACHER'])
       return NextResponse.json(
         { message: "Invalid role" },
         { status: 400 }
@@ -37,9 +36,11 @@ export async function POST(req: Request) {
 
     console.log('Checking for existing user...')
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single()
 
     if (existingUser) {
       console.log('User already exists:', email)
@@ -55,14 +56,27 @@ export async function POST(req: Request) {
 
     console.log('Creating user in database...')
     // Create user
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: role as UserRole,
-      }
-    })
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert([
+        {
+          name,
+          email,
+          password: hashedPassword,
+          role,
+        }
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating user:', error)
+      throw error
+    }
+
+    if (!user) {
+      throw new Error('Failed to create user')
+    }
 
     console.log('User created successfully:', { id: user.id, email: user.email, role: user.role })
 
@@ -77,22 +91,11 @@ export async function POST(req: Request) {
       { status: 201 }
     )
   } catch (error: unknown) {
-    // Type guard for Error objects
-    if (error instanceof Error) {
-      console.error("Registration error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      })
-    } else {
-      console.error("Unknown error type:", error)
-    }
-    
-    // Check for Prisma errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      console.error('Prisma error code:', error.code)
-      // Handle specific Prisma errors
-      if (error.code === 'P2002') {
+    console.error("Registration error details:", error)
+
+    // Check for Supabase errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      if (error.code === '23505') { // Unique constraint violation
         return NextResponse.json(
           { message: "Email already exists" },
           { status: 400 }
@@ -103,8 +106,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { 
         message: "Something went wrong", 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        errorType: error instanceof Error ? error.name : 'Unknown error type'
+        error: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     )
