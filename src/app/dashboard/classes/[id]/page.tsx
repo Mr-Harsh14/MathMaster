@@ -18,6 +18,29 @@ import {
 
 type TabType = 'overview' | 'students' | 'quizzes'
 
+interface ActivityAttempt {
+  studentName: string;
+  quizTitle: string;
+  score: number;
+  maxScore: number;
+  createdAt: string;
+}
+
+interface ClassStats {
+  totalStudents: number;
+  totalQuizzes: number;
+  averageScore: number;
+}
+
+interface ClassData {
+  name: string;
+  code: string;
+  stats: ClassStats;
+  recentActivity: {
+    attempts: ActivityAttempt[];
+  };
+}
+
 export default function ClassPage() {
   const { data: session } = useSession()
   const params = useParams()
@@ -74,13 +97,15 @@ export default function ClassPage() {
     )
   }
 
+  const typedClassData = classData as ClassData
+
   return (
     <div className="space-y-6">
       {/* Class Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">{classData.name}</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{typedClassData.name}</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Class Code: <span className="font-mono">{classData.code}</span>
+          Class Code: <span className="font-mono">{typedClassData.code}</span>
         </p>
       </div>
 
@@ -133,7 +158,7 @@ export default function ClassPage() {
                   <div className="ml-4">
                     <h3 className="text-sm font-medium text-gray-500">Students</h3>
                     <p className="mt-1 text-2xl font-semibold text-gray-900">
-                      {classData.stats.totalStudents}
+                      {typedClassData.stats.totalStudents}
                     </p>
                   </div>
                 </div>
@@ -149,7 +174,7 @@ export default function ClassPage() {
                   <div className="ml-4">
                     <h3 className="text-sm font-medium text-gray-500">Quizzes</h3>
                     <p className="mt-1 text-2xl font-semibold text-gray-900">
-                      {classData.stats.totalQuizzes}
+                      {typedClassData.stats.totalQuizzes}
                     </p>
                   </div>
                 </div>
@@ -165,7 +190,7 @@ export default function ClassPage() {
                   <div className="ml-4">
                     <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
                     <p className="mt-1 text-2xl font-semibold text-gray-900">
-                      {classData.stats.averageScore}%
+                      {typedClassData.stats.averageScore}%
                     </p>
                   </div>
                 </div>
@@ -181,7 +206,7 @@ export default function ClassPage() {
                   <div className="ml-4">
                     <h3 className="text-sm font-medium text-gray-500">Recent Activity</h3>
                     <p className="mt-1 text-2xl font-semibold text-gray-900">
-                      {classData.recentActivity.attempts.length}
+                      {typedClassData.recentActivity.attempts.length}
                     </p>
                   </div>
                 </div>
@@ -190,16 +215,16 @@ export default function ClassPage() {
           </div>
 
           {/* Recent Activity */}
-          {classData.recentActivity.attempts.length > 0 && (
+          {typedClassData.recentActivity.attempts.length > 0 && (
             <Card className="bg-white">
               <div className="p-6">
                 <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
                 <div className="mt-6 flow-root">
                   <ul role="list" className="-mb-8">
-                    {classData.recentActivity.attempts.map((activity, activityIdx) => (
+                    {typedClassData.recentActivity.attempts.map((activity: ActivityAttempt, activityIdx) => (
                       <li key={activityIdx}>
                         <div className="relative pb-8">
-                          {activityIdx !== classData.recentActivity.attempts.length - 1 ? (
+                          {activityIdx !== typedClassData.recentActivity.attempts.length - 1 ? (
                             <span
                               className="absolute left-5 top-5 -ml-px h-full w-0.5 bg-gray-200"
                               aria-hidden="true"
