@@ -3,14 +3,26 @@ import { getServerSession } from 'next-auth'
 import { connectDB } from '@/lib/mongodb'
 import User from '@/models/User'
 import Class from '@/models/Class'
-import Quiz from '@/models/Quiz'
+import Quiz, { IQuiz } from '@/models/Quiz'
 import Score from '@/models/Score'
+import { Types } from 'mongoose'
 
 interface RouteParams {
   params: {
     id: string
     quizId: string
   }
+}
+
+interface QuizDocument extends Omit<IQuiz, '_id'> {
+  _id: Types.ObjectId;
+  questions: Array<{
+    _id: Types.ObjectId;
+    question: string;
+    options: string[];
+    answer: string;
+    explanation?: string;
+  }>;
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
@@ -55,7 +67,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       _id: params.quizId,
       class: params.id
     })
-    .lean()
+    .lean() as QuizDocument | null
 
     if (!quiz) {
       return NextResponse.json(
@@ -150,7 +162,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const quiz = await Quiz.findOne({
       _id: params.quizId,
       class: params.id
-    })
+    }).lean() as QuizDocument | null
 
     if (!quiz) {
       return NextResponse.json(
