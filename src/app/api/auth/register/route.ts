@@ -1,4 +1,3 @@
-import { hash } from "bcryptjs"
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 
@@ -34,8 +33,21 @@ export async function POST(req: Request) {
       )
     }
 
-    console.log('Checking for existing user...')
-    // First, create the auth user
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single()
+
+    if (existingUser) {
+      return NextResponse.json(
+        { message: "Email already registered" },
+        { status: 400 }
+      )
+    }
+
+    // Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -43,56 +55,40 @@ export async function POST(req: Request) {
         data: {
           name,
           role
-        }
+        },
+        emailRedirectTo: `${process.env.NEXTAUTH_URL}/auth/login`
       }
     })
 
     if (authError) {
       console.error('Auth error:', authError)
-      if (authError.message.includes('already registered')) {
-        return NextResponse.json(
-          { message: "Email already registered" },
-          { status: 400 }
-        )
-      }
-      throw authError
+      return NextResponse.json(
+        { message: authError.message },
+        { status: 400 }
+      )
     }
 
     if (!authData.user) {
-      throw new Error('No user returned from auth signup')
+      return NextResponse.json(
+        { message: "Failed to create user" },
+        { status: 500 }
+      )
     }
 
-    console.log('Auth user created:', { id: authData.user.id, email: authData.user.email })
-
-    // Now create the user profile in our users table
-    const { data: user, error: profileError } = await supabase
-      .from('users')
-      .insert([
-        {
-          id: authData.user.id, // Use the auth user id
-          name,
-          email,
-          role,
-        }
-      ])
-      .select()
-      .single()
-
-    if (profileError) {
-      console.error('Profile creation error:', profileError)
-      // Try to clean up the auth user if profile creation fails
-      await supabase.auth.admin.deleteUser(authData.user.id)
-      throw profileError
-    }
-
-    console.log('User profile created successfully:', { id: user.id, email: user.email, role: user.role })
+    // The user profile will be created automatically by the database trigger
+    console.log('User registration successful:', { 
+      id: authData.user.id, 
+      email: authData.user.email,
+      role: role
+    })
 
     return NextResponse.json(
       {
         user: {
-          name: user.name,
-          email: user.email,
-          role: user.role,
+          id: authData.user.id,
+          name,
+          email,
+          role,
         }
       },
       { status: 201 }
@@ -104,21 +100,9 @@ export async function POST(req: Request) {
       stack: error instanceof Error ? error.stack : undefined
     })
 
-    // Check for specific Supabase errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      const code = (error as { code: string }).code
-      if (code === '23505') { // Unique constraint violation
-        return NextResponse.json(
-          { message: "Email already exists" },
-          { status: 400 }
-        )
-      }
-      console.error('Supabase error code:', code)
-    }
-
     return NextResponse.json(
       { 
-        message: "Something went wrong", 
+        message: "Registration failed", 
         error: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
