@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams } from 'next/navigation'
 import useClass from '@/hooks/use-class'
@@ -22,10 +22,30 @@ export default function ClassPage() {
   const { data: session } = useSession()
   const params = useParams()
   const { classData, loading, error, refresh } = useClass(params.id as string)
-  const isTeacher = session?.user?.role === 'TEACHER'
+  const [isTeacher, setIsTeacher] = useState<boolean | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('overview')
 
-  if (loading) {
+  useEffect(() => {
+    async function checkTeacherStatus() {
+      try {
+        const response = await fetch('/api/auth/check-role')
+        if (!response.ok) {
+          throw new Error('Failed to check role')
+        }
+        const data = await response.json()
+        setIsTeacher(data.role === 'TEACHER')
+      } catch (error) {
+        console.error('Error checking role:', error)
+        setIsTeacher(false)
+      }
+    }
+
+    if (session?.user?.email) {
+      checkTeacherStatus()
+    }
+  }, [session])
+
+  if (loading || isTeacher === null) {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 bg-gray-200 rounded w-1/4"></div>
