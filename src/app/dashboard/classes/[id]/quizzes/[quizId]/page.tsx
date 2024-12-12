@@ -37,7 +37,7 @@ export default function QuizPage() {
   const router = useRouter()
   const classId = params.id as string
   const quizId = params.quizId as string
-  const isTeacher = session?.user?.role === 'TEACHER'
+  const [isTeacher, setIsTeacher] = useState<boolean | null>(null)
 
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -50,6 +50,26 @@ export default function QuizPage() {
   const [correctAnswers, setCorrectAnswers] = useState<string[]>([])
   const [explanations, setExplanations] = useState<(string | null)[]>([])
   const [isEditing, setIsEditing] = useState(false)
+
+  useEffect(() => {
+    async function checkTeacherStatus() {
+      try {
+        const response = await fetch('/api/auth/check-role')
+        if (!response.ok) {
+          throw new Error('Failed to check role')
+        }
+        const data = await response.json()
+        setIsTeacher(data.role === 'TEACHER')
+      } catch (error) {
+        console.error('Error checking role:', error)
+        setIsTeacher(false)
+      }
+    }
+
+    if (session?.user?.email) {
+      checkTeacherStatus()
+    }
+  }, [session])
 
   useEffect(() => {
     async function fetchQuiz() {
@@ -82,8 +102,10 @@ export default function QuizPage() {
       }
     }
 
-    fetchQuiz()
-  }, [classId, quizId])
+    if (session?.user?.email) {
+      fetchQuiz()
+    }
+  }, [classId, quizId, session])
 
   // Timer effect
   useEffect(() => {
@@ -147,7 +169,7 @@ export default function QuizPage() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
-  if (loading) {
+  if (loading || isTeacher === null) {
     return (
       <div className="animate-pulse">
         <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
