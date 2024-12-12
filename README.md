@@ -4,7 +4,7 @@ A modern web application for learning mathematics through interactive quizzes an
 
 ## Features
 
-- User authentication (Students and Teachers)
+- User authentication (Students and Teachers) .
 - Class management with join codes
 - Interactive quiz creation and participation
 - Real-time leaderboards
