@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { connectDB } from './mongodb'
 import User from '@/models/User'
 import bcrypt from 'bcryptjs'
+import { User as AuthUser } from 'next-auth'
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -38,7 +39,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
-        }
+        } as AuthUser
       }
     })
   ],
