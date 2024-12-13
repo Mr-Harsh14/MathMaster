@@ -31,12 +31,37 @@ interface Quiz {
   }
 }
 
+interface UserRole {
+  role: string | null;
+}
+
 export default function QuizzesPage() {
   const { data: session } = useSession()
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function checkRole() {
+      try {
+        const response = await fetch('/api/auth/check-role')
+        if (!response.ok) {
+          throw new Error('Failed to check role')
+        }
+        const data: UserRole = await response.json()
+        setUserRole(data.role)
+      } catch (error) {
+        console.error('Error checking role:', error)
+        setError(error instanceof Error ? error.message : 'Failed to check role')
+      }
+    }
+
+    if (session?.user?.email) {
+      checkRole()
+    }
+  }, [session])
 
   useEffect(() => {
     async function fetchQuizzes() {
@@ -55,12 +80,12 @@ export default function QuizzesPage() {
       }
     }
 
-    if (session?.user?.email) {
+    if (session?.user?.email && userRole === 'TEACHER') {
       fetchQuizzes()
     }
-  }, [session])
+  }, [session, userRole])
 
-  if (!session?.user?.email || session?.user?.role !== 'TEACHER') {
+  if (!session?.user?.email || userRole !== 'TEACHER') {
     return (
       <div className="text-center">
         <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-gray-400" />
