@@ -14,12 +14,36 @@ interface Student {
   }[]
 }
 
+interface UserRole {
+  role: string | null;
+}
+
 export default function StudentsList({ classId }: { classId: string }) {
   const { data: session } = useSession()
-  const isTeacher = session?.user?.role === 'TEACHER'
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function checkRole() {
+      try {
+        const response = await fetch('/api/auth/check-role')
+        if (!response.ok) {
+          throw new Error('Failed to check role')
+        }
+        const data: UserRole = await response.json()
+        setUserRole(data.role)
+      } catch (error) {
+        console.error('Error checking role:', error)
+        setError(error instanceof Error ? error.message : 'Failed to check role')
+      }
+    }
+
+    if (session?.user?.email) {
+      checkRole()
+    }
+  }, [session])
 
   useEffect(() => {
     async function fetchStudents() {
@@ -101,7 +125,7 @@ export default function StudentsList({ classId }: { classId: string }) {
                       <p className="truncate font-medium text-indigo-600">
                         {student.name || 'Unnamed Student'}
                       </p>
-                      {isTeacher && (
+                      {userRole === 'TEACHER' && (
                         <p className="ml-1 flex-shrink-0 text-gray-400">
                           ({student.email})
                         </p>
