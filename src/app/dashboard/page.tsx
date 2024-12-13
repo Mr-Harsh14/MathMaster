@@ -42,7 +42,27 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const isTeacher = session?.user?.role === 'TEACHER'
+  const [isTeacher, setIsTeacher] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    async function checkTeacherStatus() {
+      try {
+        const response = await fetch('/api/auth/check-role')
+        if (!response.ok) {
+          throw new Error('Failed to check role')
+        }
+        const data = await response.json()
+        setIsTeacher(data.role === 'TEACHER')
+      } catch (error) {
+        console.error('Error checking role:', error)
+        setIsTeacher(false)
+      }
+    }
+
+    if (session?.user?.email) {
+      checkTeacherStatus()
+    }
+  }, [session])
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -66,7 +86,7 @@ export default function DashboardPage() {
     }
   }, [session])
 
-  if (loading) {
+  if (loading || isTeacher === null) {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 bg-gray-200 rounded w-1/4"></div>
