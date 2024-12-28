@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { connectDB } from '@/lib/mongodb'
-import User from '@/models/User'
+import User, { IUser } from '@/models/User'
 import bcrypt from 'bcryptjs'
 
 // GET /api/admin/users - Get all users
@@ -26,7 +26,7 @@ export async function GET() {
       )
     }
 
-    const users = await User.find({}, '-password').lean()
+    const users = await User.find({}, '-password').lean() as IUser[]
 
     return NextResponse.json(users.map(user => ({
       id: user._id.toString(),
