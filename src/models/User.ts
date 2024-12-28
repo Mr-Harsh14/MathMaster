@@ -4,7 +4,7 @@ export interface IUser extends Document {
   name: string | null
   email: string
   password: string
-  role: 'STUDENT' | 'TEACHER'
+  role: 'STUDENT' | 'TEACHER' | 'ADMIN'
   classesJoined: Schema.Types.ObjectId[]
   classesTaught: Schema.Types.ObjectId[]
   createdAt: Date
@@ -24,7 +24,7 @@ const UserSchema = new Schema<IUser>({
   },
   role: {
     type: String,
-    enum: ['STUDENT', 'TEACHER'],
+    enum: ['STUDENT', 'TEACHER', 'ADMIN'],
     default: 'STUDENT',
   },
   classesJoined: [{

@@ -34,7 +34,17 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/dashboard')
+      // Check user role
+      const roleResponse = await fetch('/api/auth/check-role')
+      const { role } = await roleResponse.json()
+
+      // Redirect based on role
+      if (role === 'ADMIN') {
+        router.push('/admin')
+      } else {
+        router.push('/dashboard')
+      }
+      
       router.refresh()
     } catch (error) {
       setError('Something went wrong. Please try again.')

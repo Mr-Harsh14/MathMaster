@@ -26,6 +26,13 @@ function getNavigation(role: string) {
     { name: 'Classes', href: '/dashboard/classes', icon: AcademicCapIcon },
   ]
 
+  if (role === 'ADMIN') {
+    return [
+      ...baseNavigation,
+      { name: 'Admin', href: '/admin', icon: UsersIcon },
+    ]
+  }
+
   if (role === 'TEACHER') {
     return [
       ...baseNavigation,

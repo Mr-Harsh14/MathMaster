@@ -130,7 +130,6 @@ export default function RegisterPage() {
                   required
                 >
                   <option value="STUDENT">Student</option>
-                  <option value="TEACHER">Teacher</option>
                 </select>
               </div>
             </div>
