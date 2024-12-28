@@ -3,6 +3,15 @@ import { getServerSession } from 'next-auth'
 import { connectDB } from '@/lib/mongodb'
 import User, { IUser } from '@/models/User'
 import bcrypt from 'bcryptjs'
+import { Types } from 'mongoose'
+
+interface UserDocument {
+  _id: Types.ObjectId
+  name: string | null
+  email: string
+  role: 'STUDENT' | 'TEACHER' | 'ADMIN'
+  __v: number
+}
 
 // GET /api/admin/users - Get all users
 export async function GET() {
@@ -26,7 +35,7 @@ export async function GET() {
       )
     }
 
-    const users = await User.find({}, '-password').lean() as IUser[]
+    const users = await User.find({}, '-password').lean() as UserDocument[]
 
     return NextResponse.json(users.map(user => ({
       id: user._id.toString(),
