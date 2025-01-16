@@ -1,96 +1,94 @@
-# MathMaster Learning Platform
+# Math Master
 
-A modern web application for learning mathematics through interactive quizzes and competitive learning.
+A comprehensive learning platform for mathematics education, featuring role-based access control and interactive learning tools.
 
 ## Features
 
-- User authentication (Students and Teachers) .
-- Class management with join codes
-- Interactive quiz creation and participation
-- Real-time leaderboards
-- Modern, responsive UI
+### For Students
+- Join classes with class codes
+- Take quizzes and assessments
+- Track progress and view scores
+- View class materials and resources
+- Compete on the leaderboard
+
+### For Teachers
+- Create and manage classes
+- Create and assign quizzes
+- Monitor student progress
+- View analytics and performance metrics
+- Manage student roster
+
+### For Administrators
+- User Management
+  - View all users in the system
+  - Create teacher accounts
+  - Delete user accounts (except admins)
+  - Reset user passwords
+- Search functionality to find users
+- Role-based access control
+
+## Getting Started
+
+1. Clone the repository
+```bash
+git clone https://github.com/your-username/math-master.git
+cd math-master
+```
+
+2. Install dependencies
+```bash
+npm install
+```
+
+3. Set up environment variables
+Create a `.env.local` file with the following variables:
+```
+MONGODB_URI=your_mongodb_connection_string
+NEXTAUTH_SECRET=your_nextauth_secret
+NEXTAUTH_URL=http://localhost:3000
+```
+
+4. Run the development server
+```bash
+npm run dev
+```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Tech Stack
 
-- Next.js 14 with App Router
-- TypeScript
-- Tailwind CSS
-- MongoDB with Mongoose
-- NextAuth.js for authentication
+- **Frontend**: Next.js 14, React, Tailwind CSS
+- **Backend**: Next.js API Routes
+- **Database**: MongoDB
+- **Authentication**: NextAuth.js
+- **UI Components**: Headless UI, Heroicons
+- **Styling**: Tailwind CSS
 
-## Project Structure
+## Authentication and Authorization
 
-- `/src/app` - Next.js app router pages
-- `/src/components` - Reusable React components
-- `/src/lib` - Utility functions and shared logic
-- `/src/models` - MongoDB schema definitions
+The application implements role-based access control with three user types:
+- **Student**: Default role for new registrations
+- **Teacher**: Created by administrators
+- **Admin**: System administrators with full access
 
-## Deployment to Vercel
+## Development
 
-1. Create a MongoDB Atlas account and database:
-   - Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-   - Create a new cluster (free tier is fine)
-   - Create a database user
-   - Get your MongoDB connection string
-   - Add your IP address to the IP whitelist (or allow access from anywhere for development)
+### Prerequisites
+- Node.js 18+
+- MongoDB database
+- npm or yarn
 
-2. Set up your project on Vercel:
-   - Fork this repository to your GitHub account
-   - Go to [Vercel](https://vercel.com)
-   - Create a new project
-   - Import your forked repository
-   - Add the following environment variables in Vercel:
-     ```
-     MONGODB_URI=your-mongodb-atlas-uri
-     NEXTAUTH_SECRET=your-secret-key
-     NEXTAUTH_URL=https://your-vercel-domain.vercel.app
-     ```
-   - Deploy!
+### Environment Setup
+1. Copy `.env.example` to `.env.local`
+2. Update the environment variables with your values
 
-3. Update your MongoDB connection string:
-   - Replace `your-mongodb-atlas-uri` with your actual MongoDB Atlas connection string
-   - Make sure to replace `<password>` in the connection string with your actual database user password
-
-4. Generate a secure NEXTAUTH_SECRET:
-   - You can generate one by running `openssl rand -base64 32` in your terminal
-   - Or use any other secure random string generator
-
-5. Update NEXTAUTH_URL:
-   - After your first deployment, update this to your actual Vercel domain
-   - Format: `https://your-app-name.vercel.app`
-
-## Local Development
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/math-app.git
-   cd math-app
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Set up your environment variables:
-   - Copy `.env.example` to `.env`
-   - Update the variables with your values
-
-4. Run the development server:
-   ```bash
-   npm run dev
-   ```
-
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+### Creating an Admin User
+1. Register a new user through the application
+2. Using MongoDB Compass or Shell:
+   - Connect to your database
+   - Find the user document
+   - Update the role field to "ADMIN"
 
 ## License
 
-This project is licensed under the MIT License. 
+[MIT License](LICENSE) 
